@@ -1,0 +1,9 @@
+{
+  "name": "Hand_Quickbelts",
+  "version_number": "0.3.8",
+  "website_url": "https://github.com/quaternion/hqb",
+  "description": "Configurable H3VR quickbelt slots attached below each hand.",
+  "dependencies": [
+    "BepInEx-BepInExPack_H3VR-5.4.1700"
+  ]
+}

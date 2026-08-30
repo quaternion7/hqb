@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>quaternion.hqb</AssemblyName>
+    <Version>0.3.8</Version>
+    <Authors>quaternion</Authors>
+    <AssemblyTitle>Hand Quickbelts</AssemblyTitle>
+    <Description>Configurable H3VR quickbelt slots attached below each hand.</Description>
+    <PackageProjectUrl>https://github.com/quaternion/hqb</PackageProjectUrl>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsPackable>false</IsPackable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Optimize>true</Optimize>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>None</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <Optimize>false</Optimize>
+    <DefineConstants>DEBUG;</DefineConstants>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net35" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="BepInEx.AutoPlugin" Version="1.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="UnityEngine" Version="5.6.1" />
+    <PackageReference Include="BepInEx.Core" Version="5.4.17" />
+    <PackageReference Include="H3VR.GameLibs" Version="0.120.22" />
+  </ItemGroup>
+</Project>

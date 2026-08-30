@@ -1,0 +1,27 @@
+{
+  "manifestVersion": 2,
+  "name": "quaternion-Hand_Quickbelts",
+  "authorName": "quaternion",
+  "websiteUrl": "https://github.com/quaternion/hqb",
+  "displayName": "Hand Quickbelts",
+  "description": "Configurable H3VR quickbelt slots attached below each hand.",
+  "gameVersion": "",
+  "networkMode": "",
+  "packageType": "",
+  "installMode": "",
+  "installedAtTime": 0,
+  "loaders": [],
+  "dependencies": [
+    "BepInEx-BepInExPack_H3VR-5.4.1700"
+  ],
+  "incompatibilities": [],
+  "optionalDependencies": [],
+  "versionNumber": {
+    "major": 0,
+    "minor": 3,
+    "patch": 8
+  },
+  "enabled": true,
+  "icon": "",
+  "onlineSource": false
+}
