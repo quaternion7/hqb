@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2
+
+- Made hand quickbelts follow H3VR's `AreQuickbeltSlotsEnabled` scene setting, keeping them out of the main menu and other scenes that disable native quickbelts.
+- Release stored contents safely when transitioning from a quickbelt-enabled scene to a disabled one.
+
 ## 0.4.1
 
 - Added an in-game-friendly integer control for stored-object size as a percentage of slot diameter, ranging from 1% to 1000% and defaulting to 80%.

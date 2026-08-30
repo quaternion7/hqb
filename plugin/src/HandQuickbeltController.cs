@@ -24,8 +24,9 @@ namespace HandQuickbelts
         internal void Tick()
         {
             FVRPlayerBody body = GM.CurrentPlayerBody;
-            if (body == null || body.LeftHand == null || body.RightHand == null)
+            if (!SceneAllowsQuickbelts(body))
             {
+                DisableForScene();
                 return;
             }
 
@@ -48,6 +49,11 @@ namespace HandQuickbelts
 
         internal void RebuildAfterQuickbeltChange(FVRPlayerBody body)
         {
+            if (!SceneAllowsQuickbelts(body))
+            {
+                DisableForScene();
+                return;
+            }
             Rebuild(body, false);
         }
 
@@ -69,7 +75,7 @@ namespace HandQuickbelts
 
         private void Rebuild(FVRPlayerBody body, bool dropContents)
         {
-            if (body == null || body.LeftHand == null || body.RightHand == null || Time.unscaledTime < _nextTemplateLookupTime)
+            if (!SceneAllowsQuickbelts(body) || Time.unscaledTime < _nextTemplateLookupTime)
             {
                 return;
             }
@@ -99,6 +105,31 @@ namespace HandQuickbelts
             CreateHandSlots(_rightRoot.transform, _rightSlots, template, Plugin.RightLargeSlots.Value, Plugin.RightMediumSlots.Value, Plugin.RightSmallSlots.Value);
             ApplyLayout();
             Plugin.Logger.LogInfo(string.Format("Created {0} hand quickbelt slots.", _slots.Count));
+        }
+
+        private static bool SceneAllowsQuickbelts(FVRPlayerBody body)
+        {
+            return body != null
+                && body.LeftHand != null
+                && body.RightHand != null
+                && GM.CurrentSceneSettings != null
+                && GM.CurrentSceneSettings.AreQuickbeltSlotsEnabled;
+        }
+
+        private void DisableForScene()
+        {
+            bool hadSlots = _slots.Count > 0 || _leftRoot != null || _rightRoot != null;
+            if (hadSlots)
+            {
+                RemoveSlots(true);
+                Plugin.Logger.LogInfo("Removed hand quickbelt slots because the current scene disables quickbelts.");
+            }
+
+            _body = null;
+            _rebuildRequested = false;
+            _layoutRequested = false;
+            _nextTemplateLookupTime = 0.0f;
+            _templateWarningLogged = false;
         }
 
         private static GameObject CreateHandRoot(string name, Transform hand)

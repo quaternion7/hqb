@@ -92,3 +92,5 @@ Runtime scale logs also established the stored-object growth mechanism: beneath 
 The RC keeps the proven self-contained slot topology while removing the temporary runtime-diagnostic framework. The cloned template's unused children are disabled and destroyed after the local `QuickbeltRoot`, native sphere pair, and `PoseOverride` are bound.
 
 User configuration is reduced to three sections. Column and row distance share one world-space spacing value. The miniaturization target is an integer percentage of the configured slot diameter, defaults to 80%, and only reduces objects that exceed that target. Scale restoration remains patched immediately before `SetParentage` or `SetQuickBeltSlot(null)` can move an item out of its scaled storage hierarchy.
+
+Scene availability follows the same `FVRSceneSettings.AreQuickbeltSlotsEnabled` flag checked by `FVRPlayerBody.Init()` before H3VR calls `ConfigureQuickbelt()`. HQB removes its slots and releases their contents while that flag is false, then rebuilds from the active native layout when a quickbelt-enabled scene becomes current.

@@ -12,6 +12,7 @@ Hand Quickbelts is a code-only BepInEx mod for H3VR. It adds configurable quickb
 - Live diameter, spacing, column, and anchor updates
 - Optional stored-item miniaturization inspired by SpineHero
 - Collider-aware insertion, so long objects can activate a slot when their body touches it
+- Scene-aware availability matching H3VR's native quickbelt setting
 
 The default layout has one large 100 mm slot on each hand. Additional slots use a two-column grid with 120 mm center-to-center spacing.
 
