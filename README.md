@@ -1,13 +1,12 @@
 # Hand Quickbelts
 
-Adds configurable quickbelt slots below both hands without replacing the player's normal body quickbelt.
+Adds configurable quickbelt slots around both hands without replacing the player's normal body quickbelt.
 
 **Compatibility:** H3VR 1.0 stable (Update 120).
 
 ## Features
 
 - Independent large, medium, and small slot counts for each hand
-- Native H3VR visuals, hover states, size rules, and scene availability
 - Symmetric placement with a mirrored pose for the opposite hand
 - Live adjustment handles for moving and rotating the slot grid
 - Configurable slot diameter, spacing, columns, and stored-object size
@@ -53,6 +52,10 @@ dotnet build .\HQB.sln -c Release
 ```
 
 The release DLL is written to `plugin/bin/Release/net35/quaternion.hqb.dll`.
+
+## Support
+
+Tips and donations are welcome through [my Ko-fi and link hub](https://quaternion7.github.io/).
 
 ## Credits
 

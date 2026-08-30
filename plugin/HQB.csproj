@@ -5,7 +5,7 @@
     <Authors>quaternion</Authors>
     <AssemblyTitle>Hand Quickbelts</AssemblyTitle>
     <Description>Configurable H3VR quickbelt slots attached below each hand.</Description>
-    <PackageProjectUrl>https://github.com/quaternion/hqb</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/quaternion7/hqb</PackageProjectUrl>
     <TargetFramework>net35</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
