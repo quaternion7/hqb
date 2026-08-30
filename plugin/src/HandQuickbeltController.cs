@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using FistVR;
 using UnityEngine;
 
@@ -7,49 +6,47 @@ namespace HandQuickbelts
 {
     internal sealed class HandQuickbeltController
     {
+        private const float MillimetersToMeters = 0.001f;
+
         private readonly List<FVRQuickBeltSlot> _slots = new List<FVRQuickBeltSlot>();
         private readonly List<FVRQuickBeltSlot> _leftSlots = new List<FVRQuickBeltSlot>();
         private readonly List<FVRQuickBeltSlot> _rightSlots = new List<FVRQuickBeltSlot>();
         private FVRPlayerBody _body;
         private GameObject _leftRoot;
         private GameObject _rightRoot;
-        private HandQuickbeltAdjustmentHandle _leftAdjustmentHandle;
-        private HandQuickbeltAdjustmentHandle _rightAdjustmentHandle;
+        private HandQuickbeltAdjustmentHandle _leftHandle;
+        private HandQuickbeltAdjustmentHandle _rightHandle;
         private bool _rebuildRequested;
-        private bool _layoutRefreshRequested;
+        private bool _layoutRequested;
         private bool _templateWarningLogged;
         private float _nextTemplateLookupTime;
 
-        internal void Update()
+        internal void Tick()
         {
-            FVRPlayerBody currentBody = GM.CurrentPlayerBody;
-            if (currentBody == null || currentBody.LeftHand == null || currentBody.RightHand == null)
+            FVRPlayerBody body = GM.CurrentPlayerBody;
+            if (body == null || body.LeftHand == null || body.RightHand == null)
             {
                 return;
             }
 
-            if (_body != currentBody || _leftRoot == null || _rightRoot == null)
+            if (_body != body || _leftRoot == null || _rightRoot == null)
             {
-                Rebuild(currentBody, false);
-                return;
+                Rebuild(body, false);
             }
-
-            if (_rebuildRequested)
+            else if (_rebuildRequested)
             {
                 _rebuildRequested = false;
-                _layoutRefreshRequested = false;
-                Rebuild(currentBody, true);
-                return;
+                _layoutRequested = false;
+                Rebuild(body, true);
             }
-
-            if (_layoutRefreshRequested)
+            else if (_layoutRequested)
             {
-                _layoutRefreshRequested = false;
+                _layoutRequested = false;
                 ApplyLayout();
             }
         }
 
-        internal void OnQuickbeltConfigured(FVRPlayerBody body)
+        internal void RebuildAfterQuickbeltChange(FVRPlayerBody body)
         {
             Rebuild(body, false);
         }
@@ -59,9 +56,9 @@ namespace HandQuickbelts
             _rebuildRequested = true;
         }
 
-        internal void RequestLayoutRefresh()
+        internal void RequestLayout()
         {
-            _layoutRefreshRequested = true;
+            _layoutRequested = true;
         }
 
         internal void Dispose()
@@ -72,12 +69,7 @@ namespace HandQuickbelts
 
         private void Rebuild(FVRPlayerBody body, bool dropContents)
         {
-            if (body == null || body.LeftHand == null || body.RightHand == null)
-            {
-                return;
-            }
-
-            if (Time.unscaledTime < _nextTemplateLookupTime)
+            if (body == null || body.LeftHand == null || body.RightHand == null || Time.unscaledTime < _nextTemplateLookupTime)
             {
                 return;
             }
@@ -89,45 +81,32 @@ namespace HandQuickbelts
                 if (!_templateWarningLogged)
                 {
                     _templateWarningLogged = true;
-                    Plugin.Logger.LogWarning("Native quickbelt prefabs are not ready yet; HQB will retry once per second.");
+                    Plugin.Logger.LogWarning("Native spherical quickbelt slots are not ready; retrying once per second.");
                 }
                 return;
             }
 
             _nextTemplateLookupTime = 0.0f;
             _templateWarningLogged = false;
-
             RemoveSlots(dropContents);
             _body = body;
 
-            _leftRoot = CreateHandRoot("HQB_LeftHand", GetPalmAnchor(body.LeftHand));
-            _rightRoot = CreateHandRoot("HQB_RightHand", GetPalmAnchor(body.RightHand));
-            _leftAdjustmentHandle = CreateAdjustmentHandle(_leftRoot.transform, true);
-            _rightAdjustmentHandle = CreateAdjustmentHandle(_rightRoot.transform, false);
-
-            CreateHandSlots(_leftRoot.transform, _leftSlots, Plugin.LeftLargeSlots.Value, Plugin.LeftMediumSlots.Value, Plugin.LeftSmallSlots.Value, template);
-            CreateHandSlots(_rightRoot.transform, _rightSlots, Plugin.RightLargeSlots.Value, Plugin.RightMediumSlots.Value, Plugin.RightSmallSlots.Value, template);
-
+            _leftRoot = CreateHandRoot("HQB_LeftHand", body.LeftHand);
+            _rightRoot = CreateHandRoot("HQB_RightHand", body.RightHand);
+            _leftHandle = CreateAdjustmentHandle(_leftRoot.transform, true);
+            _rightHandle = CreateAdjustmentHandle(_rightRoot.transform, false);
+            CreateHandSlots(_leftRoot.transform, _leftSlots, template, Plugin.LeftLargeSlots.Value, Plugin.LeftMediumSlots.Value, Plugin.LeftSmallSlots.Value);
+            CreateHandSlots(_rightRoot.transform, _rightSlots, template, Plugin.RightLargeSlots.Value, Plugin.RightMediumSlots.Value, Plugin.RightSmallSlots.Value);
             ApplyLayout();
-            if (Plugin.DeveloperDiagnosticsEnabled)
-            {
-                LogGeometryValidation();
-            }
-            Plugin.Logger.LogInfo(string.Format("Created {0} hand quickbelt slots using palm-space anchors.", _slots.Count));
+            Plugin.Logger.LogInfo(string.Format("Created {0} hand quickbelt slots.", _slots.Count));
         }
 
-        private static Transform GetPalmAnchor(Transform hand)
+        private static GameObject CreateHandRoot(string name, Transform hand)
         {
             FVRViveHand viveHand = hand.GetComponent<FVRViveHand>();
-            return viveHand != null && viveHand.PalmTransform != null ? viveHand.PalmTransform : hand;
-        }
-
-        private static GameObject CreateHandRoot(string name, Transform anchor)
-        {
+            Transform palm = viveHand != null && viveHand.PalmTransform != null ? viveHand.PalmTransform : hand;
             GameObject root = new GameObject(name);
-            root.transform.SetParent(anchor, false);
-            root.transform.localPosition = Vector3.zero;
-            root.transform.localRotation = Quaternion.identity;
+            root.transform.SetParent(palm, false);
             return root;
         }
 
@@ -137,7 +116,6 @@ namespace HandQuickbelts
             handleObject.name = isLeftHand ? "HQB_LeftAnchorHandle" : "HQB_RightAnchorHandle";
             handleObject.transform.SetParent(root, false);
             handleObject.transform.localPosition = new Vector3(0f, 0.055f, 0f);
-            handleObject.transform.localRotation = Quaternion.identity;
             handleObject.transform.localScale = Vector3.one * 0.035f;
 
             int interactableLayer = LayerMask.NameToLayer("Interactable");
@@ -165,41 +143,32 @@ namespace HandQuickbelts
             return handle;
         }
 
-        private void CreateHandSlots(
-            Transform root,
-            List<FVRQuickBeltSlot> handSlots,
-            int largeCount,
-            int mediumCount,
-            int smallCount,
-            FVRQuickBeltSlot template)
+        private void CreateHandSlots(Transform root, List<FVRQuickBeltSlot> handSlots, FVRQuickBeltSlot template, int large, int medium, int small)
         {
-            List<FVRPhysicalObject.FVRPhysicalObjectSize> sizes = new List<FVRPhysicalObject.FVRPhysicalObjectSize>();
-            AddSizes(sizes, FVRPhysicalObject.FVRPhysicalObjectSize.Large, largeCount);
-            AddSizes(sizes, FVRPhysicalObject.FVRPhysicalObjectSize.Medium, mediumCount);
-            AddSizes(sizes, FVRPhysicalObject.FVRPhysicalObjectSize.Small, smallCount);
-
-            for (int index = 0; index < sizes.Count; index++)
+            FVRPhysicalObject.FVRPhysicalObjectSize[] sizes =
             {
-                FVRQuickBeltSlot slot = CreateSlot(root, sizes[index], index, template);
-                if (slot != null)
+                FVRPhysicalObject.FVRPhysicalObjectSize.Large,
+                FVRPhysicalObject.FVRPhysicalObjectSize.Medium,
+                FVRPhysicalObject.FVRPhysicalObjectSize.Small
+            };
+            int[] counts = { large, medium, small };
+            int index = 0;
+            for (int sizeIndex = 0; sizeIndex < sizes.Length; sizeIndex++)
+            {
+                for (int created = 0; created < counts[sizeIndex]; created++, index++)
                 {
-                    handSlots.Add(slot);
+                    FVRQuickBeltSlot slot = CreateSlot(root, template, sizes[sizeIndex], index);
+                    if (slot != null)
+                    {
+                        handSlots.Add(slot);
+                    }
                 }
             }
         }
 
-        private FVRQuickBeltSlot CreateSlot(
-            Transform root,
-            FVRPhysicalObject.FVRPhysicalObjectSize size,
-            int index,
-            FVRQuickBeltSlot template)
+        private FVRQuickBeltSlot CreateSlot(Transform root, FVRQuickBeltSlot template, FVRPhysicalObject.FVRPhysicalObjectSize size, int index)
         {
-            if (template == null)
-            {
-                return null;
-            }
-
-            GameObject slotObject = UnityEngine.Object.Instantiate(template.gameObject);
+            GameObject slotObject = Object.Instantiate(template.gameObject);
             slotObject.SetActive(false);
             slotObject.name = string.Format("HQB_{0}_{1:00}", size, index + 1);
             slotObject.transform.SetParent(root, false);
@@ -208,6 +177,13 @@ namespace HandQuickbelts
             slotObject.transform.localScale = Vector3.one;
 
             FVRQuickBeltSlot slot = slotObject.GetComponent<FVRQuickBeltSlot>();
+            if (slot == null || !BuildLocalGeometry(slot, template))
+            {
+                Plugin.Logger.LogError(string.Format("Could not create {0} from template {1}.", slotObject.name, template.name));
+                Object.Destroy(slotObject);
+                return null;
+            }
+
             slot.SizeLimit = size;
             slot.Shape = FVRQuickBeltSlot.QuickbeltSlotShape.Sphere;
             slot.Type = FVRQuickBeltSlot.QuickbeltSlotType.Standard;
@@ -216,152 +192,108 @@ namespace HandQuickbelts
             slot.CurObject = null;
             slot.HeldObject = null;
             slot.IsKeepingTrackWithHead = false;
-
-            ConfigureSelfContainedGeometry(slot, template);
             slot.IsHovered = false;
-            slotObject.AddComponent<HandQuickbeltSingleVisual>().Configure(slot);
-            slotObject.AddComponent<HandQuickbeltStoredObjectScaler>();
+            slotObject.AddComponent<HandQuickbeltSlotMarker>();
+            slotObject.AddComponent<HandQuickbeltMiniaturizer>();
             slotObject.SetActive(true);
             _body.QBSlots_Internal.Add(slot);
             _slots.Add(slot);
             return slot;
         }
 
-        private static void ConfigureSelfContainedGeometry(FVRQuickBeltSlot slot, FVRQuickBeltSlot template)
+        private static bool BuildLocalGeometry(FVRQuickBeltSlot slot, FVRQuickBeltSlot template)
         {
-            if (slot == null || template == null || template.HoverGeo == null)
+            if (template == null || template.HoverGeo == null)
             {
-                Plugin.Logger.LogError(string.Format(
-                    "Cannot create self-contained geometry for slot {0}: the native template has no HoverGeo.",
-                    slot != null ? slot.name : "null"));
-                return;
+                return false;
             }
 
-            // A live quickbelt configuration can keep QuickbeltRoot, HoverGeo,
-            // and PoseOverride outside the GameObject carrying FVRQuickBeltSlot.
-            // Instantiating only template.gameObject then leaves those fields
-            // pointing into the original, inactive configuration. Build and
-            // bind a complete local hierarchy instead of retaining any of those
-            // external references.
             Renderer[] inheritedRenderers = slot.GetComponentsInChildren<Renderer>(true);
             for (int index = 0; index < inheritedRenderers.Length; index++)
             {
-                if (inheritedRenderers[index] != null)
-                {
-                    inheritedRenderers[index].enabled = false;
-                }
+                inheritedRenderers[index].enabled = false;
             }
-
-            GameObject quickbeltRootObject = new GameObject("HQB_QuickbeltRoot");
-            quickbeltRootObject.transform.SetParent(slot.transform, false);
-            quickbeltRootObject.transform.localPosition = Vector3.zero;
-            quickbeltRootObject.transform.localRotation = Quaternion.identity;
-            quickbeltRootObject.transform.localScale = Vector3.one;
-
-            GameObject hoverObject = UnityEngine.Object.Instantiate(template.HoverGeo);
-            hoverObject.name = "HQB_HoverGeo";
-            hoverObject.transform.SetParent(quickbeltRootObject.transform, false);
-            hoverObject.transform.localPosition = Vector3.zero;
-            hoverObject.transform.localRotation = Quaternion.identity;
-
-            GameObject poseObject = new GameObject("HQB_PoseOverride");
-            poseObject.transform.SetParent(quickbeltRootObject.transform, false);
-            poseObject.transform.localPosition = Vector3.zero;
-            poseObject.transform.localRotation = Quaternion.identity;
-
-            Transform templateGeometryRoot = template.QuickbeltRoot != null
-                ? template.QuickbeltRoot
-                : template.HoverGeo.transform.parent;
-            Transform nativeBaseTemplate = FindNativeBaseSphere(template, templateGeometryRoot);
-            GameObject baseObject = nativeBaseTemplate != null
-                ? UnityEngine.Object.Instantiate(nativeBaseTemplate.gameObject)
-                : UnityEngine.Object.Instantiate(template.HoverGeo);
-            baseObject.name = "HQB_BaseSphere";
-            baseObject.transform.SetParent(quickbeltRootObject.transform, false);
-            baseObject.transform.localPosition = Vector3.zero;
-            baseObject.transform.localRotation = Quaternion.identity;
-            baseObject.SetActive(true);
-
-            if (nativeBaseTemplate == null)
+            for (int index = slot.transform.childCount - 1; index >= 0; index--)
             {
-                Plugin.Logger.LogWarning(string.Format(
-                    "Slot {0} had no native constant sphere; using a HoverGeo clone as the base visual.",
-                    slot.name));
+                Object.Destroy(slot.transform.GetChild(index).gameObject);
             }
 
-            slot.QuickbeltRoot = quickbeltRootObject.transform;
-            slot.HoverGeo = hoverObject;
-            slot.PoseOverride = poseObject.transform;
-            slot.RectBounds = baseObject.transform;
+            GameObject quickbeltRoot = new GameObject("HQB_QuickbeltRoot");
+            quickbeltRoot.transform.SetParent(slot.transform, false);
 
-            Renderer hoverRenderer = FindRenderer(hoverObject.transform);
-            if (hoverRenderer == null)
+            GameObject hover = Object.Instantiate(template.HoverGeo);
+            hover.name = "HQB_HoverGeo";
+            hover.transform.SetParent(quickbeltRoot.transform, false);
+            hover.transform.localPosition = Vector3.zero;
+            hover.transform.localRotation = Quaternion.identity;
+
+            Transform templateGeometryRoot = template.QuickbeltRoot != null ? template.QuickbeltRoot : template.HoverGeo.transform.parent;
+            Transform baseTemplate = FindBaseSphere(template, templateGeometryRoot);
+            GameObject baseSphere = Object.Instantiate(baseTemplate != null ? baseTemplate.gameObject : template.HoverGeo);
+            baseSphere.name = "HQB_BaseSphere";
+            baseSphere.transform.SetParent(quickbeltRoot.transform, false);
+            baseSphere.transform.localPosition = Vector3.zero;
+            baseSphere.transform.localRotation = Quaternion.identity;
+            baseSphere.SetActive(true);
+
+            GameObject pose = new GameObject("HQB_PoseOverride");
+            pose.transform.SetParent(quickbeltRoot.transform, false);
+
+            Renderer hoverRenderer = FindRenderer(hover.transform);
+            Renderer baseRenderer = FindRenderer(baseSphere.transform);
+            if (hoverRenderer == null || baseRenderer == null)
             {
-                Plugin.Logger.LogError(string.Format("The cloned HoverGeo for {0} has no renderer.", slot.name));
-                slot.IsSelectable = false;
-                return;
+                Object.Destroy(quickbeltRoot);
+                return false;
             }
 
-            // FVRQuickBeltSlot.Update changes this material even when the native
-            // renderer is inactive, so its cached reference must follow HoverGeo.
+            slot.QuickbeltRoot = quickbeltRoot.transform;
+            slot.HoverGeo = hover;
+            slot.PoseOverride = pose.transform;
+            slot.RectBounds = baseSphere.transform;
             slot.m_hoverGeoRend = hoverRenderer;
             hoverRenderer.enabled = true;
-            Renderer baseRenderer = FindRenderer(baseObject.transform);
-            if (baseRenderer != null)
-            {
-                baseRenderer.enabled = true;
-            }
-            hoverObject.SetActive(false);
+            baseRenderer.enabled = true;
+            hover.SetActive(false);
             slot.SetBaseRotation(Quaternion.identity);
+            ApplyGeometryScale(slot);
 
-            ApplySlotGeometryScales(slot);
-
-            if (Plugin.DeveloperDiagnosticsEnabled)
+            if (baseTemplate == null)
             {
-                bool rootOwned = slot.QuickbeltRoot.IsChildOf(slot.transform);
-                bool hoverOwned = slot.HoverGeo.transform.IsChildOf(slot.transform);
-                bool poseOwned = slot.PoseOverride.IsChildOf(slot.transform);
-                Plugin.Logger.LogInfo(string.Format(
-                    "Slot ownership {0}: QuickbeltRoot child={1} active={2}; HoverGeo child={3}; PoseOverride child={4}.",
-                    slot.name,
-                    rootOwned,
-                    slot.QuickbeltRoot.gameObject.activeInHierarchy,
-                    hoverOwned,
-                    poseOwned));
+                Plugin.Logger.LogWarning(string.Format("{0} uses a hover-material clone as its fallback base sphere.", slot.name));
             }
+            return true;
         }
 
-        private static Transform FindNativeBaseSphere(FVRQuickBeltSlot template, Transform geometryRoot)
+        private static Transform FindBaseSphere(FVRQuickBeltSlot template, Transform root)
         {
-            if (template == null || template.HoverGeo == null || geometryRoot == null)
+            if (template == null || template.HoverGeo == null || root == null)
             {
                 return null;
             }
 
             Renderer hoverRenderer = FindRenderer(template.HoverGeo.transform);
-            MeshFilter hoverMeshFilter = hoverRenderer != null ? hoverRenderer.GetComponent<MeshFilter>() : null;
+            MeshFilter hoverMesh = hoverRenderer != null ? hoverRenderer.GetComponent<MeshFilter>() : null;
             Renderer fallback = null;
-            Renderer[] renderers = geometryRoot.GetComponentsInChildren<Renderer>(true);
+            Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
             for (int index = 0; index < renderers.Length; index++)
             {
-                Renderer renderer = renderers[index];
-                if (renderer == null || renderer == hoverRenderer || renderer.transform.IsChildOf(template.HoverGeo.transform))
+                Renderer candidate = renderers[index];
+                if (candidate == null || candidate == hoverRenderer || candidate.transform.IsChildOf(template.HoverGeo.transform))
                 {
                     continue;
                 }
 
                 if (fallback == null)
                 {
-                    fallback = renderer;
+                    fallback = candidate;
                 }
-
-                MeshFilter candidateMeshFilter = renderer.GetComponent<MeshFilter>();
-                if (hoverMeshFilter != null && candidateMeshFilter != null && candidateMeshFilter.sharedMesh == hoverMeshFilter.sharedMesh)
+                MeshFilter candidateMesh = candidate.GetComponent<MeshFilter>();
+                if (hoverMesh != null && candidateMesh != null && candidateMesh.sharedMesh == hoverMesh.sharedMesh)
                 {
-                    return renderer.transform;
+                    return candidate.transform;
                 }
             }
-
             return fallback != null ? fallback.transform : null;
         }
 
@@ -371,7 +303,6 @@ namespace HandQuickbelts
             {
                 return null;
             }
-
             Renderer renderer = root.GetComponent<Renderer>();
             return renderer != null ? renderer : root.GetComponentInChildren<Renderer>(true);
         }
@@ -383,51 +314,20 @@ namespace HandQuickbelts
                 return;
             }
 
-            ApplyRootTransform(
-                _leftRoot.transform,
-                Plugin.MirrorPositionAcrossX(Plugin.AnchorPosition.Value),
-                Plugin.MirrorRotationAcrossX(Quaternion.Euler(Plugin.AnchorRotation.Value)));
-            ApplyRootTransform(_rightRoot.transform, Plugin.AnchorPosition.Value, Plugin.AnchorRotation.Value);
-
+            _leftRoot.transform.localPosition = Plugin.MirrorPosition(Plugin.AnchorPosition.Value);
+            _leftRoot.transform.localRotation = Plugin.MirrorRotation(Quaternion.Euler(Plugin.AnchorRotation.Value));
+            _rightRoot.transform.localPosition = Plugin.AnchorPosition.Value;
+            _rightRoot.transform.localRotation = Quaternion.Euler(Plugin.AnchorRotation.Value);
             ArrangeSlots(_leftSlots);
             ArrangeSlots(_rightSlots);
-            SetAdjustmentHandleState(_leftAdjustmentHandle);
-            SetAdjustmentHandleState(_rightAdjustmentHandle);
-        }
-
-        private static void SetAdjustmentHandleState(HandQuickbeltAdjustmentHandle handle)
-        {
-            if (handle == null)
-            {
-                return;
-            }
-
-            bool enabled = Plugin.EnableAdjustmentHandles.Value;
-            if (!enabled && handle.IsHeld)
-            {
-                handle.ForceBreakInteraction();
-            }
-
-            if (handle.gameObject.activeSelf != enabled)
-            {
-                handle.gameObject.SetActive(enabled);
-            }
-        }
-
-        private static void ApplyRootTransform(Transform root, Vector3 position, Quaternion rotation)
-        {
-            root.localPosition = position;
-            root.localRotation = rotation;
-        }
-
-        private static void ApplyRootTransform(Transform root, Vector3 position, Vector3 rotation)
-        {
-            ApplyRootTransform(root, position, Quaternion.Euler(rotation));
+            SetHandleVisible(_leftHandle);
+            SetHandleVisible(_rightHandle);
         }
 
         private static void ArrangeSlots(List<FVRQuickBeltSlot> slots)
         {
-            int columns = Mathf.Max(1, Plugin.LayoutColumns.Value);
+            int columns = Mathf.Max(1, Plugin.GridColumns.Value);
+            float spacing = Plugin.SlotSpacingMillimeters.Value * MillimetersToMeters;
             for (int index = 0; index < slots.Count; index++)
             {
                 FVRQuickBeltSlot slot = slots[index];
@@ -438,251 +338,69 @@ namespace HandQuickbelts
 
                 int row = index / columns;
                 int column = index % columns;
-                int columnsInThisRow = Mathf.Min(columns, slots.Count - row * columns);
-                float x = (column - (columnsInThisRow - 1) * 0.5f) * MillimetersToMeters(Plugin.ColumnSpacingMillimeters.Value);
-                float z = -row * MillimetersToMeters(Plugin.RowSpacingMillimeters.Value);
+                int rowCount = Mathf.Min(columns, slots.Count - row * columns);
+                float x = (column - (rowCount - 1) * 0.5f) * spacing;
+                float z = -row * spacing;
                 Transform parent = slot.transform.parent;
-                if (parent != null)
-                {
-                    // The tracked palm hierarchy uses a 0.1 scale. Configured
-                    // spacing is a world-space measurement, so convert the
-                    // desired offset back into this parent's local space.
-                    Vector3 worldOffset = parent.right * x + parent.forward * z;
-                    slot.transform.localPosition = parent.InverseTransformVector(worldOffset);
-                }
-                else
-                {
-                    slot.transform.localPosition = new Vector3(x, 0f, z);
-                }
-
-                ApplySlotGeometryScales(slot);
+                slot.transform.localPosition = parent != null
+                    ? parent.InverseTransformVector(parent.right * x + parent.forward * z)
+                    : new Vector3(x, 0f, z);
+                ApplyGeometryScale(slot);
             }
         }
 
-        private static void ApplySlotGeometryScales(FVRQuickBeltSlot slot)
+        private static void SetHandleVisible(HandQuickbeltAdjustmentHandle handle)
         {
-            float diameter = SlotDiameterMeters();
-            if (slot.HoverGeo != null)
-            {
-                SetWorldUnitSphereDiameter(slot.HoverGeo.transform, diameter);
-            }
-
-            if (slot.RectBounds != null)
-            {
-                // Use the exact same center, orientation, and compensated world
-                // scale as HoverGeo. This makes the displayed base sphere,
-                // highlighted sphere, and H3VR hit volume one coincident volume.
-                if (slot.HoverGeo != null)
-                {
-                    slot.RectBounds.position = slot.HoverGeo.transform.position;
-                    slot.RectBounds.rotation = slot.HoverGeo.transform.rotation;
-                    slot.RectBounds.localScale = slot.HoverGeo.transform.localScale;
-                }
-                else
-                {
-                    SetWorldUnitSphereDiameter(slot.RectBounds, diameter);
-                }
-            }
-        }
-
-        private static void SetWorldUnitSphereDiameter(Transform sphere, float diameter)
-        {
-            Vector3 parentScale = sphere.parent != null ? sphere.parent.lossyScale : Vector3.one;
-            sphere.localScale = new Vector3(
-                diameter / NonZeroAbsolute(parentScale.x),
-                diameter / NonZeroAbsolute(parentScale.y),
-                diameter / NonZeroAbsolute(parentScale.z));
-        }
-
-        private static float NonZeroAbsolute(float value)
-        {
-            return Mathf.Max(0.0001f, Mathf.Abs(value));
-        }
-
-        private static float SlotDiameterMeters()
-        {
-            return Mathf.Max(0.001f, Mathf.Abs(MillimetersToMeters(Plugin.SlotDiameterMillimeters.Value)));
-        }
-
-        private static float MillimetersToMeters(int millimeters)
-        {
-            return millimeters * 0.001f;
-        }
-
-        internal void DumpDiagnostics()
-        {
-            StringBuilder report = new StringBuilder();
-            report.AppendLine("===== Hand Quickbelts live diagnostics =====");
-            report.AppendFormat("Body: {0}; slots tracked: {1}; QBSlots_Internal: {2}\n", ObjectName(_body), _slots.Count, _body != null && _body.QBSlots_Internal != null ? _body.QBSlots_Internal.Count : -1);
-            report.AppendFormat(
-                "Configured native slot diameter: {0} mm; miniaturize stored objects: {1}; target size: {2} mm\n",
-                Plugin.SlotDiameterMillimeters.Value,
-                Plugin.MiniaturizeStoredObjects.Value,
-                Plugin.StoredObjectTargetSizeMillimeters.Value);
-
-            for (int index = 0; index < _slots.Count; index++)
-            {
-                FVRQuickBeltSlot slot = _slots[index];
-                if (slot == null)
-                {
-                    report.AppendFormat("Slot {0}: destroyed\n", index);
-                    continue;
-                }
-
-                bool registered = _body != null && _body.QBSlots_Internal != null && _body.QBSlots_Internal.Contains(slot);
-                report.AppendFormat(
-                    "Slot {0}: {1}; registered={2}; selectable={3}; shape={4}; type={5}; size={6}; held={7}\n",
-                    index,
-                    slot.name,
-                    registered,
-                    slot.IsSelectable,
-                    slot.Shape,
-                    slot.Type,
-                    slot.SizeLimit,
-                    ObjectName(slot.HeldObject));
-                report.AppendFormat("  QuickbeltRoot: {0}\n", TransformSummary(slot.QuickbeltRoot));
-                report.AppendFormat("  PoseOverride: {0}\n", TransformSummary(slot.PoseOverride));
-                report.AppendFormat("  HoverGeo: {0}\n", slot.HoverGeo != null ? TransformSummary(slot.HoverGeo.transform) : "null");
-                report.AppendFormat("  Hover renderer: {0}\n", slot.m_hoverGeoRend != null ? TransformSummary(slot.m_hoverGeoRend.transform) : "null");
-                report.AppendFormat("  RectBounds/base marker: {0}\n", TransformSummary(slot.RectBounds));
-                report.AppendFormat(
-                    "  Geometry world centers: hover={0}; base={1}; delta={2}; requestedDiameter={3:0.###} m\n",
-                    slot.HoverGeo != null ? slot.HoverGeo.transform.position.ToString() : "null",
-                    slot.RectBounds != null ? slot.RectBounds.position.ToString() : "null",
-                    slot.HoverGeo != null && slot.RectBounds != null ? Vector3.Distance(slot.HoverGeo.transform.position, slot.RectBounds.position).ToString("0.######") : "n/a",
-                    SlotDiameterMeters());
-                report.AppendFormat(
-                    "  Renderer world bounds: hover={0}; base={1}\n",
-                    RendererBoundsSummary(slot.m_hoverGeoRend),
-                    RendererBoundsSummary(slot.RectBounds != null ? slot.RectBounds.GetComponent<Renderer>() : null));
-                HandQuickbeltStoredObjectScaler scaler = slot.GetComponent<HandQuickbeltStoredObjectScaler>();
-                report.AppendFormat("  Stored-object scaler: {0}\n", scaler != null ? scaler.DiagnosticSummary : "missing");
-                HandQuickbeltSingleVisual visual = slot.GetComponent<HandQuickbeltSingleVisual>();
-                report.AppendFormat("  Visible indicator: {0}\n", visual != null ? visual.DiagnosticSummary : "missing");
-                AppendHierarchy(report, slot.transform, 1);
-            }
-
-            report.AppendLine("===== End Hand Quickbelts live diagnostics =====");
-            Plugin.Logger.LogInfo(report.ToString());
-        }
-
-        private void LogGeometryValidation()
-        {
-            for (int index = 0; index < _slots.Count; index++)
-            {
-                FVRQuickBeltSlot slot = _slots[index];
-                if (slot == null || slot.HoverGeo == null || slot.RectBounds == null)
-                {
-                    continue;
-                }
-
-                Renderer baseRenderer = slot.RectBounds.GetComponent<Renderer>();
-                HandQuickbeltSingleVisual visual = slot.GetComponent<HandQuickbeltSingleVisual>();
-                Plugin.Logger.LogInfo(string.Format(
-                    "Geometry check {0}: hitCenter={1}, visualCenter={2}, centerDelta={3:0.######} m, hitWorldScale={4}, nativeBounds={5}, indicator={6}.",
-                    slot.name,
-                    slot.HoverGeo.transform.position,
-                    slot.RectBounds.position,
-                    Vector3.Distance(slot.HoverGeo.transform.position, slot.RectBounds.position),
-                    slot.HoverGeo.transform.lossyScale,
-                    RendererBoundsSummary(baseRenderer),
-                    visual != null ? visual.DiagnosticSummary : "missing"));
-            }
-        }
-
-        private static void AppendHierarchy(StringBuilder report, Transform transform, int depth)
-        {
-            if (transform == null)
+            if (handle == null)
             {
                 return;
             }
-
-            report.Append(' ', depth * 2);
-            report.Append("- ");
-            report.Append(TransformSummary(transform));
-            report.Append(" components=[");
-            Component[] components = transform.GetComponents<Component>();
-            for (int index = 0; index < components.Length; index++)
+            bool visible = Plugin.ShowAdjustmentHandles.Value;
+            if (!visible && handle.IsHeld)
             {
-                if (index > 0)
-                {
-                    report.Append(", ");
-                }
-                report.Append(components[index] != null ? components[index].GetType().FullName : "destroyed");
+                handle.ForceBreakInteraction();
             }
-            report.AppendLine("]");
-
-            for (int index = 0; index < transform.childCount; index++)
+            if (handle.gameObject.activeSelf != visible)
             {
-                AppendHierarchy(report, transform.GetChild(index), depth + 1);
+                handle.gameObject.SetActive(visible);
             }
         }
 
-        private static string TransformSummary(Transform transform)
+        private static void ApplyGeometryScale(FVRQuickBeltSlot slot)
         {
-            if (transform == null)
+            float diameter = Mathf.Max(0.001f, Mathf.Abs(Plugin.SlotDiameterMillimeters.Value * MillimetersToMeters));
+            if (slot.HoverGeo != null)
             {
-                return "null";
+                SetWorldDiameter(slot.HoverGeo.transform, diameter);
             }
-
-            return string.Format(
-                "{0} active={1} localPos={2} localRot={3} localScale={4} lossyScale={5}",
-                transform.name,
-                transform.gameObject.activeInHierarchy,
-                transform.localPosition,
-                transform.localEulerAngles,
-                transform.localScale,
-                transform.lossyScale);
+            if (slot.RectBounds != null && slot.HoverGeo != null)
+            {
+                slot.RectBounds.position = slot.HoverGeo.transform.position;
+                slot.RectBounds.rotation = slot.HoverGeo.transform.rotation;
+                slot.RectBounds.localScale = slot.HoverGeo.transform.localScale;
+            }
         }
 
-        private static string ObjectName(UnityEngine.Object value)
+        private static void SetWorldDiameter(Transform sphere, float diameter)
         {
-            return value != null ? value.name : "null";
-        }
-
-        private static string RendererBoundsSummary(Renderer renderer)
-        {
-            if (renderer == null)
-            {
-                return "null";
-            }
-
-            return string.Format("center={0} size={1} enabled={2}", renderer.bounds.center, renderer.bounds.size, renderer.enabled);
+            Vector3 scale = sphere.parent != null ? sphere.parent.lossyScale : Vector3.one;
+            sphere.localScale = new Vector3(
+                diameter / Mathf.Max(0.0001f, Mathf.Abs(scale.x)),
+                diameter / Mathf.Max(0.0001f, Mathf.Abs(scale.y)),
+                diameter / Mathf.Max(0.0001f, Mathf.Abs(scale.z)));
         }
 
         private FVRQuickBeltSlot FindTemplate(FVRPlayerBody body)
         {
-            FVRQuickBeltSlot fallback = null;
-
-            // Prefer a spherical slot from the player's active quickbelt so the
-            // clones match the preset the user is actually seeing, including
-            // any custom material overrides. Stock Harness and regular slots
-            // both use QuickSlotGlow/QuickSlotGlowConstant.
             if (body != null && body.QBSlots_Internal != null)
             {
                 for (int index = 0; index < body.QBSlots_Internal.Count; index++)
                 {
-                    FVRQuickBeltSlot activeSlot = body.QBSlots_Internal[index];
-                    if (activeSlot == null
-                        || activeSlot.GetComponent<HandQuickbeltSingleVisual>() != null
-                        || activeSlot.Shape != FVRQuickBeltSlot.QuickbeltSlotShape.Sphere
-                        || activeSlot.HoverGeo == null)
+                    FVRQuickBeltSlot candidate = body.QBSlots_Internal[index];
+                    if (IsUsableTemplate(candidate) && candidate.GetComponent<HandQuickbeltSlotMarker>() == null)
                     {
-                        continue;
+                        return candidate;
                     }
-
-                    Transform geometryRoot = activeSlot.QuickbeltRoot != null
-                        ? activeSlot.QuickbeltRoot
-                        : activeSlot.HoverGeo.transform.parent;
-                    if (FindNativeBaseSphere(activeSlot, geometryRoot) == null)
-                    {
-                        continue;
-                    }
-
-                    Plugin.Logger.LogInfo(string.Format(
-                        "Using active quickbelt slot {0} as the HQB visual template.",
-                        activeSlot.name));
-                    return activeSlot;
                 }
             }
 
@@ -691,43 +409,42 @@ namespace HandQuickbelts
                 return null;
             }
 
+            FVRQuickBeltSlot fallback = null;
             foreach (GameObject configuration in ManagerSingleton<GM>.Instance.QuickbeltConfigurations)
             {
                 if (configuration == null)
                 {
                     continue;
                 }
-
                 FVRQuickBeltSlot[] candidates = configuration.GetComponentsInChildren<FVRQuickBeltSlot>(true);
-                foreach (FVRQuickBeltSlot candidate in candidates)
+                for (int index = 0; index < candidates.Length; index++)
                 {
-                    if (candidate == null || candidate.HoverGeo == null)
+                    FVRQuickBeltSlot candidate = candidates[index];
+                    if (!IsUsableTemplate(candidate))
                     {
                         continue;
                     }
-
                     if (fallback == null)
                     {
                         fallback = candidate;
                     }
-
-                    // The vanilla harness slot is already a 20 cm coincident
-                    // sphere pair, making it the cleanest prefab for every HQB
-                    // size category. SizeLimit is assigned after cloning.
                     if (candidate.name == "QuickBeltSlot_Harness")
                     {
-                        Plugin.Logger.LogInfo("Using vanilla QuickBeltSlot_Harness as the HQB slot prefab.");
                         return candidate;
                     }
                 }
             }
-
-            if (fallback != null)
-            {
-                Plugin.Logger.LogWarning(string.Format("QuickBeltSlot_Harness was unavailable; using native fallback prefab {0}.", fallback.name));
-            }
-
             return fallback;
+        }
+
+        private static bool IsUsableTemplate(FVRQuickBeltSlot slot)
+        {
+            if (slot == null || slot.Shape != FVRQuickBeltSlot.QuickbeltSlotShape.Sphere || slot.HoverGeo == null)
+            {
+                return false;
+            }
+            Transform root = slot.QuickbeltRoot != null ? slot.QuickbeltRoot : slot.HoverGeo.transform.parent;
+            return FindBaseSphere(slot, root) != null;
         }
 
         private void RemoveSlots(bool dropContents)
@@ -741,30 +458,27 @@ namespace HandQuickbelts
                 }
 
                 slot.IsSelectable = false;
-                HandQuickbeltStoredObjectScaler scaler = slot.GetComponent<HandQuickbeltStoredObjectScaler>();
-                if (scaler != null)
+                HandQuickbeltMiniaturizer miniaturizer = slot.GetComponent<HandQuickbeltMiniaturizer>();
+                if (miniaturizer != null)
                 {
-                    scaler.RestoreNow();
+                    miniaturizer.Restore();
                 }
-
                 if (dropContents && slot.CurObject != null)
                 {
                     slot.CurObject.ClearQuickbeltState();
                 }
-
                 if (_body != null && _body.QBSlots_Internal != null)
                 {
                     _body.QBSlots_Internal.Remove(slot);
                 }
-
-                UnityEngine.Object.Destroy(slot.gameObject);
+                Object.Destroy(slot.gameObject);
             }
 
             _slots.Clear();
             _leftSlots.Clear();
             _rightSlots.Clear();
-            _leftAdjustmentHandle = null;
-            _rightAdjustmentHandle = null;
+            _leftHandle = null;
+            _rightHandle = null;
             DestroyRoot(ref _leftRoot);
             DestroyRoot(ref _rightRoot);
         }
@@ -773,17 +487,250 @@ namespace HandQuickbelts
         {
             if (root != null)
             {
-                UnityEngine.Object.Destroy(root);
+                Object.Destroy(root);
                 root = null;
             }
         }
+    }
 
-        private static void AddSizes(List<FVRPhysicalObject.FVRPhysicalObjectSize> sizes, FVRPhysicalObject.FVRPhysicalObjectSize size, int count)
+    internal sealed class HandQuickbeltSlotMarker : MonoBehaviour
+    {
+    }
+
+    internal sealed class HandQuickbeltAdjustmentHandle : FVRInteractiveObject
+    {
+        private Transform _anchor;
+        private bool _isLeftHand;
+        private Vector3 _positionOffset;
+        private Quaternion _rotationOffset;
+
+        internal void Configure(Transform anchor, bool isLeftHand)
         {
-            for (int index = 0; index < count; index++)
+            _anchor = anchor;
+            _isLeftHand = isLeftHand;
+            ControlType = FVRInteractionControlType.GrabHold;
+            PoseOverride = transform;
+            EndInteractionIfDistant = false;
+        }
+
+        public override bool IsDistantGrabbable()
+        {
+            return false;
+        }
+
+        public override void BeginInteraction(FVRViveHand hand)
+        {
+            base.BeginInteraction(hand);
+            if (_anchor != null)
             {
-                sizes.Add(size);
+                Quaternion inverseHandRotation = Quaternion.Inverse(m_handRot);
+                _positionOffset = inverseHandRotation * (_anchor.position - m_handPos);
+                _rotationOffset = inverseHandRotation * _anchor.rotation;
             }
+        }
+
+        public override void UpdateInteraction(FVRViveHand hand)
+        {
+            base.UpdateInteraction(hand);
+            if (_anchor != null)
+            {
+                _anchor.position = m_handPos + m_handRot * _positionOffset;
+                _anchor.rotation = m_handRot * _rotationOffset;
+            }
+        }
+
+        public override void EndInteraction(FVRViveHand hand)
+        {
+            if (_anchor != null && Plugin.Instance != null)
+            {
+                Plugin.Instance.SaveAnchorPose(_isLeftHand, _anchor.localPosition, _anchor.localRotation);
+            }
+            base.EndInteraction(hand);
+        }
+    }
+
+    internal sealed class HandQuickbeltMiniaturizer : MonoBehaviour
+    {
+        private readonly HashSet<GameObject> _knownPhysicalObjects = new HashSet<GameObject>();
+        private FVRQuickBeltSlot _slot;
+        private FVRPhysicalObject _item;
+        private Vector3 _originalScale;
+        private Vector3 _storedScale;
+        private float _scaleFactor = 1.0f;
+        private float _targetSize;
+        private int _knownTransformCount;
+
+        private void Awake()
+        {
+            _slot = GetComponent<FVRQuickBeltSlot>();
+        }
+
+        private void Update()
+        {
+            FVRPhysicalObject current = Plugin.MiniaturizeStoredObjects.Value && _slot != null
+                ? _slot.HeldObject as FVRPhysicalObject
+                : null;
+            if (current != _item)
+            {
+                Restore();
+                if (current != null)
+                {
+                    Track(current);
+                }
+            }
+            if (_item == null)
+            {
+                return;
+            }
+
+            float target = TargetSizeMeters();
+            if (!Mathf.Approximately(target, _targetSize))
+            {
+                RestoreScale();
+                Fit(target);
+            }
+            if (_item.IsHeld)
+            {
+                RestoreScale();
+                return;
+            }
+
+            RefitAfterHierarchyChange();
+            ApplyScale();
+        }
+
+        private void OnDestroy()
+        {
+            Restore();
+        }
+
+        internal void Restore()
+        {
+            RestoreScale();
+            _item = null;
+            _storedScale = Vector3.zero;
+            _scaleFactor = 1.0f;
+            _targetSize = 0.0f;
+            _knownTransformCount = 0;
+            _knownPhysicalObjects.Clear();
+        }
+
+        internal void RestoreBeforeRemoval(FVRPhysicalObject physicalObject)
+        {
+            if (_item == physicalObject)
+            {
+                Restore();
+            }
+        }
+
+        private void Track(FVRPhysicalObject physicalObject)
+        {
+            _item = physicalObject;
+            _originalScale = physicalObject.transform.localScale;
+            RecordHierarchy();
+            Fit(TargetSizeMeters());
+        }
+
+        private void Fit(float targetSize)
+        {
+            _targetSize = targetSize;
+            _scaleFactor = 1.0f;
+            _storedScale = _originalScale;
+
+            Bounds bounds;
+            if (!TryGetColliderBounds(_item.gameObject, out bounds))
+            {
+                return;
+            }
+            Vector3 size = bounds.size;
+            float largestAxis = Mathf.Max(size.x, Mathf.Max(size.y, size.z));
+            if (largestAxis > targetSize)
+            {
+                _scaleFactor = targetSize / largestAxis;
+                _storedScale = _originalScale * _scaleFactor;
+            }
+        }
+
+        private void RefitAfterHierarchyChange()
+        {
+            Transform[] transforms = _item.GetComponentsInChildren<Transform>(true);
+            if (transforms.Length == _knownTransformCount)
+            {
+                return;
+            }
+
+            RestoreScale();
+            FVRPhysicalObject[] physicalObjects = _item.GetComponentsInChildren<FVRPhysicalObject>(true);
+            for (int index = 0; index < physicalObjects.Length; index++)
+            {
+                FVRPhysicalObject physicalObject = physicalObjects[index];
+                if (physicalObject != null && physicalObject != _item && !_knownPhysicalObjects.Contains(physicalObject.gameObject))
+                {
+                    physicalObject.transform.localScale *= _scaleFactor;
+                }
+            }
+            RecordHierarchy();
+            Fit(_targetSize);
+        }
+
+        private void RecordHierarchy()
+        {
+            _knownPhysicalObjects.Clear();
+            _knownTransformCount = _item.GetComponentsInChildren<Transform>(true).Length;
+            FVRPhysicalObject[] physicalObjects = _item.GetComponentsInChildren<FVRPhysicalObject>(true);
+            for (int index = 0; index < physicalObjects.Length; index++)
+            {
+                if (physicalObjects[index] != null)
+                {
+                    _knownPhysicalObjects.Add(physicalObjects[index].gameObject);
+                }
+            }
+        }
+
+        private void RestoreScale()
+        {
+            if (_item != null)
+            {
+                _item.transform.localScale = _originalScale;
+            }
+        }
+
+        private void ApplyScale()
+        {
+            if (_item != null && !_item.IsHeld)
+            {
+                _item.transform.localScale = _storedScale;
+            }
+        }
+
+        private static float TargetSizeMeters()
+        {
+            return Mathf.Max(0.001f, Mathf.Abs(Plugin.SlotDiameterMillimeters.Value) * 0.0008f);
+        }
+
+        private static bool TryGetColliderBounds(GameObject root, out Bounds bounds)
+        {
+            bounds = new Bounds();
+            bool found = false;
+            Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+            for (int index = 0; index < colliders.Length; index++)
+            {
+                Collider collider = colliders[index];
+                if (collider == null || !collider.enabled || !collider.gameObject.activeInHierarchy || collider.isTrigger)
+                {
+                    continue;
+                }
+                if (!found)
+                {
+                    bounds = collider.bounds;
+                    found = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(collider.bounds);
+                }
+            }
+            return found;
         }
     }
 }

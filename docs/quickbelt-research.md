@@ -25,13 +25,13 @@ The hierarchy can be reproduced with:
 
 ```powershell
 python .\.tools\inspect_unity_bundle.py `
-  'E:\SteamLibrary\steamapps\common\H3VR\h3vr_Data\resources.assets' `
+  '<H3VR install>\h3vr_Data\resources.assets' `
   'QuickBeltPrefab_Config0_Tactical' --max-depth 4
 ```
 
 ## Game-code path
 
-The installed `Assembly-CSharp.dll` was inspected with the existing `F:\projects\h3zm\.tools\ilspycmd.exe` workflow.
+The installed `Assembly-CSharp.dll` was inspected with ILSpy's command-line decompiler.
 
 `FVRViveHand.TestQuickBeltDistances()` chooses a test point as follows:
 
@@ -87,6 +87,8 @@ Asset inspection confirms that the normal tactical spheres and `QuickBeltSlot_Ha
 
 Runtime scale logs also established the stored-object growth mechanism: beneath the hand's `0.1` scale hierarchy, Unity's world-preserving reparent produced an expected local scale of `10`. Restoring that saved local scale only after H3VR had moved the object out of `QuickbeltRoot` multiplied its world size by ten; each later cycle captured `100`, `1000`, and so on. HQB 0.3.7 patches the removal paths and restores the saved scale before `SetParentage`, `BeginInteraction`, or quickbelt clearing changes the hierarchy.
 
-## HQB runtime diagnostics
+## HQB 0.4 release-candidate structure
 
-Runtime diagnostics are gated by the source-only `Plugin.DeveloperDiagnosticsEnabled` flag. Enabling it and rebuilding writes ownership, transforms, scales, renderer state, hover transitions, and post-tracking geometry without exposing a user-facing config entry.
+The RC keeps the proven self-contained slot topology while removing the temporary runtime-diagnostic framework. The cloned template's unused children are disabled and destroyed after the local `QuickbeltRoot`, native sphere pair, and `PoseOverride` are bound.
+
+User configuration is reduced to three sections. Column and row distance share one world-space spacing value, and the miniaturization target is derived as 80% of the configured slot diameter. Scale restoration remains patched immediately before `SetParentage` or `SetQuickBeltSlot(null)` can move an item out of its scaled storage hierarchy.

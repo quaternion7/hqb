@@ -4,6 +4,19 @@ using UnityEngine;
 
 namespace HandQuickbelts
 {
+    [HarmonyPatch(typeof(FVRPlayerBody), "ConfigureQuickbelt")]
+    internal static class ConfigureQuickbeltPatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(FVRPlayerBody __instance)
+        {
+            if (Plugin.Instance != null)
+            {
+                Plugin.Instance.RebuildAfterQuickbeltChange(__instance);
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(FVRViveHand), "TestQuickBeltDistances")]
     internal static class HandQuickbeltInteractionPatch
     {
@@ -26,7 +39,7 @@ namespace HandQuickbelts
             for (int index = 0; index < GM.CurrentPlayerBody.QBSlots_Internal.Count; index++)
             {
                 FVRQuickBeltSlot slot = GM.CurrentPlayerBody.QBSlots_Internal[index];
-                if (!CanStore(slot, physicalObject) || !IntersectsVisibleSphere(slot, physicalObject))
+                if (!CanStore(slot, physicalObject) || !IntersectsSlot(slot, physicalObject))
                 {
                     continue;
                 }
@@ -34,15 +47,15 @@ namespace HandQuickbelts
                 float distance = (slot.HoverGeo.transform.position - physicalObject.transform.position).sqrMagnitude;
                 if (distance < closestDistance)
                 {
-                    closestDistance = distance;
                     closest = slot;
+                    closestDistance = distance;
                 }
             }
 
             if (closest != null)
             {
-                __instance.CurrentHoveredQuickbeltSlotDirty = closest;
                 __instance.CurrentHoveredQuickbeltSlot = closest;
+                __instance.CurrentHoveredQuickbeltSlotDirty = closest;
             }
             else if (IsHandQuickbelt(__instance.CurrentHoveredQuickbeltSlot))
             {
@@ -63,10 +76,10 @@ namespace HandQuickbelts
 
         private static bool IsHandQuickbelt(FVRQuickBeltSlot slot)
         {
-            return slot != null && slot.GetComponent<HandQuickbeltSingleVisual>() != null;
+            return slot != null && slot.GetComponent<HandQuickbeltSlotMarker>() != null;
         }
 
-        private static bool IntersectsVisibleSphere(FVRQuickBeltSlot slot, FVRPhysicalObject physicalObject)
+        private static bool IntersectsSlot(FVRQuickBeltSlot slot, FVRPhysicalObject physicalObject)
         {
             if (slot.HoverGeo == null)
             {
@@ -74,12 +87,11 @@ namespace HandQuickbelts
             }
 
             Vector3 center = slot.HoverGeo.transform.position;
-            Vector3 worldScale = slot.HoverGeo.transform.lossyScale;
-            float radius = 0.5f * Mathf.Min(Mathf.Abs(worldScale.x), Mathf.Min(Mathf.Abs(worldScale.y), Mathf.Abs(worldScale.z)));
+            Vector3 scale = slot.HoverGeo.transform.lossyScale;
+            float radius = 0.5f * Mathf.Min(Mathf.Abs(scale.x), Mathf.Min(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
             float radiusSquared = radius * radius;
             Collider[] colliders = physicalObject.GetComponentsInChildren<Collider>(true);
-            bool foundUsableCollider = false;
-
+            bool foundCollider = false;
             for (int index = 0; index < colliders.Length; index++)
             {
                 Collider collider = colliders[index];
@@ -88,20 +100,53 @@ namespace HandQuickbelts
                     continue;
                 }
 
-                foundUsableCollider = true;
+                foundCollider = true;
                 if (collider.bounds.SqrDistance(center) <= radiusSquared)
                 {
                     return true;
                 }
             }
 
-            if (!foundUsableCollider)
+            if (foundCollider)
             {
-                Transform testPoint = physicalObject.PoseOverride != null ? physicalObject.PoseOverride : physicalObject.transform;
-                return slot.HoverGeo.transform.InverseTransformPoint(testPoint.position).magnitude < 0.5f;
+                return false;
             }
+            Transform point = physicalObject.PoseOverride != null ? physicalObject.PoseOverride : physicalObject.transform;
+            return slot.HoverGeo.transform.InverseTransformPoint(point.position).magnitude < 0.5f;
+        }
+    }
 
-            return false;
+    [HarmonyPatch]
+    internal static class StoredObjectScalePatch
+    {
+        [HarmonyPatch(typeof(FVRPhysicalObject), "SetParentage")]
+        [HarmonyPrefix]
+        private static void BeforeSetParentage(FVRPhysicalObject __instance)
+        {
+            RestoreBeforeRemoval(__instance);
+        }
+
+        [HarmonyPatch(typeof(FVRPhysicalObject), "SetQuickBeltSlot")]
+        [HarmonyPrefix]
+        private static void BeforeClearQuickbelt(FVRPhysicalObject __instance, FVRQuickBeltSlot slot)
+        {
+            if (slot == null)
+            {
+                RestoreBeforeRemoval(__instance);
+            }
+        }
+
+        private static void RestoreBeforeRemoval(FVRPhysicalObject physicalObject)
+        {
+            if (physicalObject == null || physicalObject.QuickbeltSlot == null)
+            {
+                return;
+            }
+            HandQuickbeltMiniaturizer miniaturizer = physicalObject.QuickbeltSlot.GetComponent<HandQuickbeltMiniaturizer>();
+            if (miniaturizer != null)
+            {
+                miniaturizer.RestoreBeforeRemoval(physicalObject);
+            }
         }
     }
 }

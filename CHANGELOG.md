@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 - RC1
+
+- Promoted the latest tested shared anchor pose to the default while retaining one large slot per hand as the default inventory.
+- Consolidated the user config into `Slots`, `Placement`, and `Stored Objects` with one shared grid-spacing value.
+- Made the miniaturization target follow 80% of the slot diameter automatically.
+- Removed configuration descriptions about absent limits.
+- Consolidated nine source files into three and removed the inactive diagnostic framework, redundant patch, duplicated layout helpers, and temporary visual component.
+- Simplified the runtime slot hierarchy by discarding unused children inherited from the native template after binding the self-contained geometry.
+
 ## 0.3.8
 
 - Fixed column and row offsets being compressed by the tracked palm hierarchy's `0.1` scale; configured millimeters are now converted to true world-space distances.

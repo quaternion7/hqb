@@ -1,10 +1,12 @@
 using System;
 using System.ComponentModel;
+using System.Globalization;
 using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using FistVR;
 using HarmonyLib;
+using UnityEngine;
 
 namespace HandQuickbelts
 {
@@ -12,16 +14,8 @@ namespace HandQuickbelts
     [BepInProcess("h3vr.exe")]
     public partial class Plugin : BaseUnityPlugin
     {
-        // Change this locally and rebuild when full hierarchy/geometry logging is
-        // needed during development. It is intentionally not a user config entry.
-        internal static readonly bool DeveloperDiagnosticsEnabled = false;
-
-        internal static readonly UnityEngine.Vector3 DefaultAnchorPosition = new UnityEngine.Vector3(-1.7515284f, -0.57437253f, -0.59017724f);
-        internal static readonly UnityEngine.Vector3 DefaultAnchorRotation = new UnityEngine.Vector3(-62.12213f, -120.375916f, -44.089874f);
-
-        private Harmony _harmony;
-        private HandQuickbeltController _controller;
-        private bool _resetInProgress;
+        internal static readonly Vector3 DefaultAnchorPosition = new Vector3(-1.4656025f, 0.07558223f, -0.8075327f);
+        internal static readonly Vector3 DefaultAnchorRotation = new Vector3(-6.0018616f, 36.728462f, 174.04753f);
 
         internal static Plugin Instance { get; private set; }
         internal new static ManualLogSource Logger { get; private set; }
@@ -32,51 +26,28 @@ namespace HandQuickbelts
         internal static ConfigEntry<int> RightLargeSlots { get; private set; }
         internal static ConfigEntry<int> RightMediumSlots { get; private set; }
         internal static ConfigEntry<int> RightSmallSlots { get; private set; }
-        internal static ConfigEntry<int> LayoutColumns { get; private set; }
-        internal static ConfigEntry<int> ColumnSpacingMillimeters { get; private set; }
-        internal static ConfigEntry<int> RowSpacingMillimeters { get; private set; }
+        internal static ConfigEntry<int> GridColumns { get; private set; }
+        internal static ConfigEntry<int> SlotSpacingMillimeters { get; private set; }
         internal static ConfigEntry<int> SlotDiameterMillimeters { get; private set; }
-        internal static ConfigEntry<bool> MiniaturizeStoredObjects { get; private set; }
-        internal static ConfigEntry<int> StoredObjectTargetSizeMillimeters { get; private set; }
-        internal static ConfigEntry<bool> EnableAdjustmentHandles { get; private set; }
+        internal static ConfigEntry<Vector3> AnchorPosition { get; private set; }
+        internal static ConfigEntry<Vector3> AnchorRotation { get; private set; }
+        internal static ConfigEntry<bool> ShowAdjustmentHandles { get; private set; }
         internal static ConfigEntry<bool> ResetAllSettings { get; private set; }
-        internal static ConfigEntry<UnityEngine.Vector3> AnchorPosition { get; private set; }
-        internal static ConfigEntry<UnityEngine.Vector3> AnchorRotation { get; private set; }
+        internal static ConfigEntry<bool> MiniaturizeStoredObjects { get; private set; }
+
+        private HandQuickbeltController _controller;
+        private Harmony _harmony;
+        private bool _resetting;
 
         private void Awake()
         {
             Instance = this;
             Logger = base.Logger;
-
-            if (!TypeDescriptor.GetConverter(typeof(UnityEngine.Vector3)).CanConvertFrom(typeof(string)))
-            {
-                TypeDescriptor.AddAttributes(typeof(UnityEngine.Vector3), new TypeConverterAttribute(typeof(Vector3ConfigTypeConverter)));
-            }
-
-            EnableAdjustmentHandles = Config.Bind("Live Adjustment", "Enable Adjustment Handles", false, "Show grabbable anchor handles. Grab each handle with the opposite hand; releasing it saves the new palm-local position and rotation.");
-            ResetAllSettings = Config.Bind("Live Adjustment", "Reset All Settings", false, "Turn this on to restore every Hand Quickbelts setting to its default. It turns itself off after resetting.");
-
-            LeftLargeSlots = BindSlotCount("Left Hand", "Large Slots", 1);
-            LeftMediumSlots = BindSlotCount("Left Hand", "Medium Slots", 0);
-            LeftSmallSlots = BindSlotCount("Left Hand", "Small Slots", 0);
-            RightLargeSlots = BindSlotCount("Right Hand", "Large Slots", 1);
-            RightMediumSlots = BindSlotCount("Right Hand", "Medium Slots", 0);
-            RightSmallSlots = BindSlotCount("Right Hand", "Small Slots", 0);
-
-            LayoutColumns = Config.Bind("Layout", "Columns", 2, "Number of slots across the forearm before starting another row. Values below 1 behave as 1.");
-            ColumnSpacingMillimeters = Config.Bind("Layout", "Column Spacing (mm)", 120, "Horizontal center-to-center spacing between slots, in millimeters. The default leaves a 20 mm gap between 100 mm slots. This setting has no configured limit.");
-            RowSpacingMillimeters = Config.Bind("Layout", "Row Spacing (mm)", 120, "Spacing toward the elbow between rows, in millimeters. The default leaves a 20 mm gap between 100 mm slots. This setting has no configured limit.");
-            SlotDiameterMillimeters = Config.Bind("Layout", "Slot Diameter (mm)", 100, "World-space diameter shared by the native sphere visuals and spherical interaction area. This setting has no configured limit.");
-
-            MiniaturizeStoredObjects = Config.Bind("Stored Objects", "Miniaturize Stored Objects", true, "Scale objects down while they are stored, using the same collider-bounds fitting approach as SpineHero. Their original scale is restored when they leave the slot.");
-            StoredObjectTargetSizeMillimeters = Config.Bind("Stored Objects", "Target Size (mm)", 80, "Maximum size of a stored object's combined collider bounds on each axis. Scaling is uniform and never enlarges small objects. The 80 mm default fits inside the 100 mm slot. This setting has no configured limit.");
-
-            AnchorPosition = Config.Bind("Anchor", "Position (meters)", DefaultAnchorPosition, "Shared palm-local anchor position as x, y, z in meters. The same pose is applied symmetrically to both hands.");
-            AnchorRotation = Config.Bind("Anchor", "Rotation (degrees)", DefaultAnchorRotation, "Shared palm-local Euler rotation as x, y, z in degrees. Adjustment handles are the recommended way to change this.");
+            RegisterVectorConverter();
+            BindConfig();
 
             _controller = new HandQuickbeltController();
             SubscribeToConfigChanges();
-
             _harmony = new Harmony(Id);
             _harmony.PatchAll();
             Logger.LogMessage(string.Format("{0} {1} loaded.", Name, Version));
@@ -86,7 +57,7 @@ namespace HandQuickbelts
         {
             if (_controller != null)
             {
-                _controller.Update();
+                _controller.Tick();
             }
         }
 
@@ -107,41 +78,53 @@ namespace HandQuickbelts
             Instance = null;
         }
 
-        internal void OnQuickbeltConfigured(FVRPlayerBody body)
+        private void BindConfig()
         {
-            if (_controller != null)
-            {
-                _controller.OnQuickbeltConfigured(body);
-            }
+            LeftLargeSlots = BindSlotCount("Left Large Slots", 1, "Large quickbelt slots attached below the left hand.");
+            LeftMediumSlots = BindSlotCount("Left Medium Slots", 0, "Medium quickbelt slots attached below the left hand.");
+            LeftSmallSlots = BindSlotCount("Left Small Slots", 0, "Small quickbelt slots attached below the left hand.");
+            RightLargeSlots = BindSlotCount("Right Large Slots", 1, "Large quickbelt slots attached below the right hand.");
+            RightMediumSlots = BindSlotCount("Right Medium Slots", 0, "Medium quickbelt slots attached below the right hand.");
+            RightSmallSlots = BindSlotCount("Right Small Slots", 0, "Small quickbelt slots attached below the right hand.");
+            GridColumns = Config.Bind("Slots", "Grid Columns", 2, "Slots per row before the grid wraps toward the elbow.");
+            SlotSpacingMillimeters = Config.Bind("Slots", "Slot Spacing (mm)", 120, "World-space center-to-center spacing on both grid axes.");
+            SlotDiameterMillimeters = Config.Bind("Slots", "Slot Diameter (mm)", 100, "World-space diameter of each native sphere visual and interaction volume.");
+
+            AnchorPosition = Config.Bind("Placement", "Anchor Position (meters)", DefaultAnchorPosition, "Shared palm-local position. The left hand uses its mirrored pose.");
+            AnchorRotation = Config.Bind("Placement", "Anchor Rotation (degrees)", DefaultAnchorRotation, "Shared palm-local Euler rotation. The left hand uses its mirrored pose.");
+            ShowAdjustmentHandles = Config.Bind("Placement", "Show Adjustment Handles", false, "Show grabbable handles for moving and rotating the shared anchor pose.");
+            ResetAllSettings = Config.Bind("Placement", "Reset All Settings", false, "Restore every Hand Quickbelts setting to its default, then turn this toggle off.");
+
+            MiniaturizeStoredObjects = Config.Bind("Stored Objects", "Miniaturize Stored Objects", true, "Scale stored items to fit within 80% of the slot diameter and restore them before removal.");
         }
 
-        private ConfigEntry<int> BindSlotCount(string hand, string size, int defaultValue)
+        private ConfigEntry<int> BindSlotCount(string name, int defaultValue, string description)
         {
             return Config.Bind(
-                hand,
-                size,
+                "Slots",
+                name,
                 defaultValue,
-                new ConfigDescription(
-                    string.Format("Number of {0} quickbelt slots attached below the {1}. Changing this drops items held by hand slots.", size.ToLowerInvariant(), hand.ToLowerInvariant()),
-                    new AcceptableValueRange<int>(0, 10)));
+                new ConfigDescription(description + " Changing a slot count drops items stored in hand slots.", new AcceptableValueRange<int>(0, 10)));
         }
 
         private void SubscribeToConfigChanges()
         {
-            LeftLargeSlots.SettingChanged += OnSlotCountChanged;
-            LeftMediumSlots.SettingChanged += OnSlotCountChanged;
-            LeftSmallSlots.SettingChanged += OnSlotCountChanged;
-            RightLargeSlots.SettingChanged += OnSlotCountChanged;
-            RightMediumSlots.SettingChanged += OnSlotCountChanged;
-            RightSmallSlots.SettingChanged += OnSlotCountChanged;
+            ConfigEntry<int>[] slotCounts =
+            {
+                LeftLargeSlots, LeftMediumSlots, LeftSmallSlots,
+                RightLargeSlots, RightMediumSlots, RightSmallSlots
+            };
+            for (int index = 0; index < slotCounts.Length; index++)
+            {
+                slotCounts[index].SettingChanged += OnSlotCountChanged;
+            }
 
-            LayoutColumns.SettingChanged += OnLayoutChanged;
-            ColumnSpacingMillimeters.SettingChanged += OnLayoutChanged;
-            RowSpacingMillimeters.SettingChanged += OnLayoutChanged;
+            GridColumns.SettingChanged += OnLayoutChanged;
+            SlotSpacingMillimeters.SettingChanged += OnLayoutChanged;
             SlotDiameterMillimeters.SettingChanged += OnLayoutChanged;
-            EnableAdjustmentHandles.SettingChanged += OnLayoutChanged;
             AnchorPosition.SettingChanged += OnLayoutChanged;
             AnchorRotation.SettingChanged += OnLayoutChanged;
+            ShowAdjustmentHandles.SettingChanged += OnLayoutChanged;
             ResetAllSettings.SettingChanged += OnResetAllSettingsChanged;
         }
 
@@ -157,84 +140,126 @@ namespace HandQuickbelts
         {
             if (_controller != null)
             {
-                _controller.RequestLayoutRefresh();
+                _controller.RequestLayout();
             }
-        }
-
-        internal void SaveAnchorPose(bool isLeftHand, UnityEngine.Vector3 position, UnityEngine.Quaternion rotation)
-        {
-            UnityEngine.Vector3 canonicalPosition = isLeftHand ? MirrorPositionAcrossX(position) : position;
-            UnityEngine.Quaternion canonicalRotation = isLeftHand ? MirrorRotationAcrossX(rotation) : rotation;
-            UnityEngine.Vector3 eulerAngles = canonicalRotation.eulerAngles;
-
-            AnchorPosition.Value = canonicalPosition;
-            AnchorRotation.Value = new UnityEngine.Vector3(
-                NormalizeAngle(eulerAngles.x),
-                NormalizeAngle(eulerAngles.y),
-                NormalizeAngle(eulerAngles.z));
-            Config.Save();
-
-            Logger.LogInfo(string.Format(
-                "Saved {0} anchor: position {1} meters, rotation {2} degrees.",
-                isLeftHand ? "left" : "right",
-                AnchorPosition.Value,
-                AnchorRotation.Value));
-        }
-
-        internal static UnityEngine.Vector3 MirrorPositionAcrossX(UnityEngine.Vector3 position)
-        {
-            return new UnityEngine.Vector3(-position.x, position.y, position.z);
-        }
-
-        internal static UnityEngine.Quaternion MirrorRotationAcrossX(UnityEngine.Quaternion rotation)
-        {
-            return new UnityEngine.Quaternion(rotation.x, -rotation.y, -rotation.z, rotation.w);
         }
 
         private void OnResetAllSettingsChanged(object sender, EventArgs eventArgs)
         {
-            if (_resetInProgress || !ResetAllSettings.Value)
+            if (_resetting || !ResetAllSettings.Value)
             {
                 return;
             }
 
-            _resetInProgress = true;
-
-            EnableAdjustmentHandles.Value = false;
-
+            _resetting = true;
             LeftLargeSlots.Value = 1;
             LeftMediumSlots.Value = 0;
             LeftSmallSlots.Value = 0;
             RightLargeSlots.Value = 1;
             RightMediumSlots.Value = 0;
             RightSmallSlots.Value = 0;
-
-            LayoutColumns.Value = 2;
-            ColumnSpacingMillimeters.Value = 120;
-            RowSpacingMillimeters.Value = 120;
+            GridColumns.Value = 2;
+            SlotSpacingMillimeters.Value = 120;
             SlotDiameterMillimeters.Value = 100;
-
-            MiniaturizeStoredObjects.Value = true;
-            StoredObjectTargetSizeMillimeters.Value = 80;
-
             AnchorPosition.Value = DefaultAnchorPosition;
             AnchorRotation.Value = DefaultAnchorRotation;
-
+            ShowAdjustmentHandles.Value = false;
+            MiniaturizeStoredObjects.Value = true;
             ResetAllSettings.Value = false;
             Config.Save();
-            _resetInProgress = false;
+            _resetting = false;
 
             if (_controller != null)
             {
                 _controller.RequestRebuild();
             }
-
             Logger.LogInfo("Reset all settings to defaults.");
+        }
+
+        internal void RebuildAfterQuickbeltChange(FVRPlayerBody body)
+        {
+            if (_controller != null)
+            {
+                _controller.RebuildAfterQuickbeltChange(body);
+            }
+        }
+
+        internal void SaveAnchorPose(bool isLeftHand, Vector3 position, Quaternion rotation)
+        {
+            Vector3 canonicalPosition = isLeftHand ? MirrorPosition(position) : position;
+            Quaternion canonicalRotation = isLeftHand ? MirrorRotation(rotation) : rotation;
+            Vector3 euler = canonicalRotation.eulerAngles;
+
+            AnchorPosition.Value = canonicalPosition;
+            AnchorRotation.Value = new Vector3(NormalizeAngle(euler.x), NormalizeAngle(euler.y), NormalizeAngle(euler.z));
+            Config.Save();
+            Logger.LogInfo(string.Format("Saved shared anchor from the {0} handle: position {1}, rotation {2}.", isLeftHand ? "left" : "right", AnchorPosition.Value, AnchorRotation.Value));
+        }
+
+        internal static Vector3 MirrorPosition(Vector3 position)
+        {
+            return new Vector3(-position.x, position.y, position.z);
+        }
+
+        internal static Quaternion MirrorRotation(Quaternion rotation)
+        {
+            return new Quaternion(rotation.x, -rotation.y, -rotation.z, rotation.w);
         }
 
         private static float NormalizeAngle(float angle)
         {
             return angle > 180.0f ? angle - 360.0f : angle;
+        }
+
+        private static void RegisterVectorConverter()
+        {
+            if (!TypeDescriptor.GetConverter(typeof(Vector3)).CanConvertFrom(typeof(string)))
+            {
+                TypeDescriptor.AddAttributes(typeof(Vector3), new TypeConverterAttribute(typeof(Vector3ConfigTypeConverter)));
+            }
+        }
+    }
+
+    public sealed class Vector3ConfigTypeConverter : System.ComponentModel.TypeConverter
+    {
+        public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+        {
+            return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
+        }
+
+        public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
+        {
+            return destinationType == typeof(string) || base.CanConvertTo(context, destinationType);
+        }
+
+        public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+        {
+            string text = value as string;
+            if (text == null)
+            {
+                return base.ConvertFrom(context, culture, value);
+            }
+
+            string[] parts = text.Trim().Trim('(', ')').Split(',');
+            if (parts.Length != 3)
+            {
+                throw new FormatException("Expected a vector in x, y, z format.");
+            }
+
+            return new Vector3(
+                float.Parse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture),
+                float.Parse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture),
+                float.Parse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture));
+        }
+
+        public override object ConvertTo(ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
+        {
+            if (destinationType == typeof(string) && value is Vector3)
+            {
+                Vector3 vector = (Vector3)value;
+                return string.Format(CultureInfo.InvariantCulture, "{0:0.######}, {1:0.######}, {2:0.######}", vector.x, vector.y, vector.z);
+            }
+            return base.ConvertTo(context, culture, value, destinationType);
         }
     }
 }
