@@ -4,34 +4,37 @@ Adds configurable quickbelt slots around both hands without replacing the player
 
 **Compatibility:** H3VR 1.0 stable (Update 120).
 
+[Thunderstore](https://thunderstore.io/c/h3vr/p/quaternion/Hand_Quickbelts/) | [Source code](https://github.com/quaternion7/hqb)
+
 ## Features
 
 - Independent large, medium, and small slot counts for each hand
 - Symmetric placement with a mirrored pose for the opposite hand
 - Live adjustment handles for moving and rotating the slot grid
 - Configurable slot diameter, spacing, columns, and stored-object size
-- Optional miniaturization that restores an item's original scale on removal
+- Optional miniaturization to make items smaller while stored in the slot
 - Collider-aware insertion for long or unusually shaped objects
 
 ## Quick setup guide
 
 1. Install with r2modman or Thunderstore Mod Manager and launch H3VR.
 2. Enter a scene that enables quickbelts.
-3. Open the wrist menu, then select `Mod Panel` > `Hand Quickbelts`.
-4. Configure the slot counts, grid, and stored-object behavior.
-5. Enable `Placement` > `Show Adjustment Handles`.
-6. Grab either colored handle with the opposite hand, move and rotate it, then release it to save. The other hand updates with the mirrored pose.
-7. Disable the adjustment handles when finished.
+
+## In-Game Slots Customization
+
+1. Open the wrist menu, then select `Mod Panel` > `Hand Quickbelts`.
+2. Configure the slot counts, grid, and stored-object behavior.
+3. Enable `Placement` > `Show Adjustment Handles`.
+4. Grab either colored handle with the opposite hand, move and rotate it, then release it to save. The other hand updates with the mirrored pose.
+5. Disable the adjustment handles when finished.
 
 Most settings update immediately. Changing slot counts or resetting the configuration rebuilds the hand slots and releases their contents. Scenes that disable H3VR's native quickbelt also disable Hand Quickbelts.
 
 ## Configuration
 
 - `Slots`: per-hand size counts, grid columns, spacing, and visual/interaction diameter
-- `Placement`: shared anchor pose, adjustment handles, and reset
+- `Placement`: shared anchor pose (mirrored for both hands), adjustment handles, and reset
 - `Stored Objects`: miniaturization and maximum stored size as a percentage of slot diameter
-
-Miniaturization only shrinks objects that exceed the configured stored size; it never enlarges them.
 
 ## Installation
 
@@ -55,8 +58,12 @@ The release DLL is written to `plugin/bin/Release/net35/quaternion.hqb.dll`.
 
 ## Support
 
-Tips and donations are welcome through [my Ko-fi and link hub](https://quaternion7.github.io/).
+Tips and donations are welcome on [Ko-fi](https://ko-fi.com/quaternion7). You can find my other projects and links at [quaternion7.github.io](https://quaternion7.github.io/).
+
+## License
+
+Hand Quickbelts is available under the permissive [MIT-0 license](LICENSE).
 
 ## Credits
 
-Inspired by Ax's [SpineHero](https://thunderstore.io/c/h3vr/p/Ax/SpineHero/). SpineHero was used as a behavioral reference; Hand Quickbelts uses H3VR's native assets and does not require OtherLoader or MeatKit.
+Inspired by Ax's [SpineHero](https://thunderstore.io/c/h3vr/p/Ax/SpineHero/).
