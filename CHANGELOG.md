@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Added an in-game-friendly integer control for stored-object size as a percentage of slot diameter, ranging from 1% to 1000% and defaulting to 80%.
+- Kept miniaturization shrink-only so the setting never enlarges an object beyond its original scale.
+
 ## 0.4.0 - RC1
 
 - Promoted the latest tested shared anchor pose to the default while retaining one large slot per hand as the default inventory.

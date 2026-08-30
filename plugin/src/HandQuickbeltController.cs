@@ -705,7 +705,8 @@ namespace HandQuickbelts
 
         private static float TargetSizeMeters()
         {
-            return Mathf.Max(0.001f, Mathf.Abs(Plugin.SlotDiameterMillimeters.Value) * 0.0008f);
+            float diameterMeters = Mathf.Abs(Plugin.SlotDiameterMillimeters.Value) * 0.001f;
+            return Mathf.Max(0.001f, diameterMeters * Plugin.StoredSizePercent.Value * 0.01f);
         }
 
         private static bool TryGetColliderBounds(GameObject root, out Bounds bounds)

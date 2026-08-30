@@ -34,6 +34,7 @@ namespace HandQuickbelts
         internal static ConfigEntry<bool> ShowAdjustmentHandles { get; private set; }
         internal static ConfigEntry<bool> ResetAllSettings { get; private set; }
         internal static ConfigEntry<bool> MiniaturizeStoredObjects { get; private set; }
+        internal static ConfigEntry<int> StoredSizePercent { get; private set; }
 
         private HandQuickbeltController _controller;
         private Harmony _harmony;
@@ -95,7 +96,14 @@ namespace HandQuickbelts
             ShowAdjustmentHandles = Config.Bind("Placement", "Show Adjustment Handles", false, "Show grabbable handles for moving and rotating the shared anchor pose.");
             ResetAllSettings = Config.Bind("Placement", "Reset All Settings", false, "Restore every Hand Quickbelts setting to its default, then turn this toggle off.");
 
-            MiniaturizeStoredObjects = Config.Bind("Stored Objects", "Miniaturize Stored Objects", true, "Scale stored items to fit within 80% of the slot diameter and restore them before removal.");
+            MiniaturizeStoredObjects = Config.Bind("Stored Objects", "Miniaturize Stored Objects", true, "Reduce stored items to fit and restore their original scale before removal.");
+            StoredSizePercent = Config.Bind(
+                "Stored Objects",
+                "Stored Size (% of Slot Diameter)",
+                80,
+                new ConfigDescription(
+                    "Maximum stored-object size as a percentage of the slot diameter. Objects are reduced to fit but never enlarged.",
+                    new AcceptableValueRange<int>(1, 1000)));
         }
 
         private ConfigEntry<int> BindSlotCount(string name, int defaultValue, string description)
@@ -165,6 +173,7 @@ namespace HandQuickbelts
             AnchorRotation.Value = DefaultAnchorRotation;
             ShowAdjustmentHandles.Value = false;
             MiniaturizeStoredObjects.Value = true;
+            StoredSizePercent.Value = 80;
             ResetAllSettings.Value = false;
             Config.Save();
             _resetting = false;

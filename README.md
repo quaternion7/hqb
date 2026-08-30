@@ -21,7 +21,7 @@ The generated BepInEx config has three sections:
 
 - `Slots`: per-hand slot counts, grid columns, shared spacing, and slot diameter
 - `Placement`: shared position and rotation vectors, adjustment handles, and reset
-- `Stored Objects`: miniaturization toggle
+- `Stored Objects`: miniaturization toggle and stored-size percentage
 
 Most settings update immediately. Changing a slot count rebuilds the hand inventory and drops objects stored in those slots.
 
@@ -32,7 +32,7 @@ The default palm-local pose is:
 - Position: `(-1.4656025, 0.07558223, -0.8075327)` meters
 - Rotation: `(-6.0018616, 36.728462, 174.04753)` degrees
 
-When miniaturization is enabled, stored objects larger than 80% of the slot diameter are scaled uniformly to fit. Their original scale is restored before H3VR changes their quickbelt parent.
+When miniaturization is enabled, stored objects larger than `Stored Size (% of Slot Diameter)` are scaled uniformly to fit. The default is 80%. Their original scale is restored before H3VR changes their quickbelt parent, and smaller objects are never enlarged.
 
 ## Implementation
 
