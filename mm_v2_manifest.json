@@ -12,7 +12,8 @@
   "installedAtTime": 0,
   "loaders": [],
   "dependencies": [
-    "BepInEx-BepInExPack_H3VR-5.4.1700"
+    "BepInEx-BepInExPack_H3VR-5.4.1700",
+    "nrgill28-Sodalite-1.5.1"
   ],
   "incompatibilities": [],
   "optionalDependencies": [],

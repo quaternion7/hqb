@@ -1,58 +1,59 @@
 # Hand Quickbelts
 
-Hand Quickbelts is a code-only BepInEx mod for H3VR. It adds configurable quickbelt slots beside both hands without replacing the player's normal quickbelt layout.
+Adds configurable quickbelt slots below both hands without replacing the player's normal body quickbelt.
 
-![Hand Quickbelts presentation](assets/hand-quickbelts-presentation.png)
+**Compatibility:** H3VR 1.0 stable (Update 120).
 
 ## Features
 
 - Independent large, medium, and small slot counts for each hand
-- Native H3VR quickbelt visuals, hover behavior, size rules, and state colors
-- Symmetric hand placement with in-game grabbable adjustment handles
-- Live diameter, spacing, column, and anchor updates
-- Optional stored-item miniaturization inspired by SpineHero
-- Collider-aware insertion, so long objects can activate a slot when their body touches it
-- Scene-aware availability matching H3VR's native quickbelt setting
+- Native H3VR visuals, hover states, size rules, and scene availability
+- Symmetric placement with a mirrored pose for the opposite hand
+- Live adjustment handles for moving and rotating the slot grid
+- Configurable slot diameter, spacing, columns, and stored-object size
+- Optional miniaturization that restores an item's original scale on removal
+- Collider-aware insertion for long or unusually shaped objects
 
-The default layout has one large 100 mm slot on each hand. Additional slots use a two-column grid with 120 mm center-to-center spacing.
+## Quick setup guide
+
+1. Install with r2modman or Thunderstore Mod Manager and launch H3VR.
+2. Enter a scene that enables quickbelts.
+3. Open the wrist menu, then select `Mod Panel` > `Hand Quickbelts`.
+4. Configure the slot counts, grid, and stored-object behavior.
+5. Enable `Placement` > `Show Adjustment Handles`.
+6. Grab either colored handle with the opposite hand, move and rotate it, then release it to save. The other hand updates with the mirrored pose.
+7. Disable the adjustment handles when finished.
+
+Most settings update immediately. Changing slot counts or resetting the configuration rebuilds the hand slots and releases their contents. Scenes that disable H3VR's native quickbelt also disable Hand Quickbelts.
 
 ## Configuration
 
-The generated BepInEx config has three sections:
+- `Slots`: per-hand size counts, grid columns, spacing, and visual/interaction diameter
+- `Placement`: shared anchor pose, adjustment handles, and reset
+- `Stored Objects`: miniaturization and maximum stored size as a percentage of slot diameter
 
-- `Slots`: per-hand slot counts, grid columns, shared spacing, and slot diameter
-- `Placement`: shared position and rotation vectors, adjustment handles, and reset
-- `Stored Objects`: miniaturization toggle and stored-size percentage
+Miniaturization only shrinks objects that exceed the configured stored size; it never enlarges them.
 
-Most settings update immediately. Changing a slot count rebuilds the hand inventory and drops objects stored in those slots.
+## Installation
 
-With Sodalite installed, open Hand Quickbelts from the wrist menu's Mod Panel. Enable `Placement / Show Adjustment Handles`, grab either colored handle with the opposite hand, then move and rotate it. Releasing the handle saves a canonical pose; the other hand receives its mirrored equivalent.
+Installing through a mod manager is recommended and installs the dependencies automatically.
 
-The default palm-local pose is:
-
-- Position: `(-1.4656025, 0.07558223, -0.8075327)` meters
-- Rotation: `(-6.0018616, 36.728462, 174.04753)` degrees
-
-When miniaturization is enabled, stored objects larger than `Stored Size (% of Slot Diameter)` are scaled uniformly to fit. The default is 80%. Their original scale is restored before H3VR changes their quickbelt parent, and smaller objects are never enlarged.
+For a manual installation, install BepInExPack H3VR and Sodalite, then place `quaternion.hqb.dll` in `BepInEx/plugins`.
 
 ## Implementation
 
-Each generated slot owns a hand-attached `QuickbeltRoot`, `HoverGeo`, and `PoseOverride`. Its base and hover spheres are cloned from the player's active spherical quickbelt slot, preserving native materials and preset-specific overrides. `HoverGeo` supplies the same world-space sphere used for the visible indicator and interaction test.
-
-H3VR normally tests a held object's single pose point when selecting quickbelt slots. Hand Quickbelts extends only its own slots with physical-collider overlap while leaving normal body slots and empty-hand retrieval unchanged.
-
-See [the quickbelt research note](docs/quickbelt-research.md) for the extracted vanilla and SpineHero hierarchies and the relevant decompiled H3VR code paths.
+The mod clones H3VR's active spherical quickbelt geometry into palm-attached slots, keeping native materials and behavior. Small, targeted patches add collider-aware insertion and safe object-scale restoration.
 
 ## Building
 
-Requirements: the .NET SDK and NuGet access.
+Requires the .NET SDK and NuGet access.
 
 ```powershell
 dotnet build .\HQB.sln -c Release
 ```
 
-The plugin is written to `plugin/bin/Release/net35/quaternion.hqb.dll`. Install it in an H3VR profile's `BepInEx/plugins` directory.
+The release DLL is written to `plugin/bin/Release/net35/quaternion.hqb.dll`.
 
 ## Credits
 
-The requested behavior was inspired by Ax's [SpineHero](https://thunderstore.io/c/h3vr/p/Ax/SpineHero/). SpineHero's Thunderstore assemblies and asset bundle were used as a behavioral reference; Hand Quickbelts creates its slots from H3VR's native quickbelt assets and does not require OtherLoader or a MeatKit bundle.
+Inspired by Ax's [SpineHero](https://thunderstore.io/c/h3vr/p/Ax/SpineHero/). SpineHero was used as a behavioral reference; Hand Quickbelts uses H3VR's native assets and does not require OtherLoader or MeatKit.

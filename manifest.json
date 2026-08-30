@@ -4,6 +4,7 @@
   "website_url": "https://github.com/quaternion/hqb",
   "description": "Configurable H3VR quickbelt slots attached below each hand.",
   "dependencies": [
-    "BepInEx-BepInExPack_H3VR-5.4.1700"
+    "BepInEx-BepInExPack_H3VR-5.4.1700",
+    "nrgill28-Sodalite-1.5.1"
   ]
 }
