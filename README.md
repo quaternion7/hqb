@@ -56,6 +56,8 @@ dotnet build .\HQB.sln -c Release
 
 The release DLL is written to `plugin/bin/Release/net35/quaternion.hqb.dll`.
 
+Run `.\tools\package.ps1` to create a validated Thunderstore ZIP. See the [publishing guide](docs/publishing.md) for first-upload and update steps.
+
 ## Support
 
 Tips and donations are welcome on [Ko-fi](https://ko-fi.com/quaternion7). You can find my other projects and links at [quaternion7.github.io](https://quaternion7.github.io/).
