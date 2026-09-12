@@ -15,6 +15,18 @@ Adds configurable quickbelt slots around both hands without replacing the player
 - Optional miniaturization to make items smaller while stored in the slot
 - Collider-aware insertion for long or unusually shaped objects
 
+## Mod compatibility
+
+Includes a targeted correction for MasteryCamos making spawnlocked items approximately 10x too large when pulled from hand slots. It applies only when the size increase matches the hand-parent scale compensation; other scale mismatches are not covered.
+
+## Recent changes
+
+- **1.0.0:** Fixed the approximately 10x spawnlocked-item scaling issue due to mod compatibility (MasteryCamos), limited to hand slots.
+- **0.4.2:** Added H3VR 1.0 stable support and respected scenes that disable quickbelts.
+- **0.4.1:** Added adjustable stored-object size.
+
+[Full changelog](https://github.com/quaternion7/hqb/blob/main/CHANGELOG.md)
+
 ## Quick setup guide
 
 1. Install with r2modman or Thunderstore Mod Manager and launch H3VR.

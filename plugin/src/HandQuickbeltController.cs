@@ -654,6 +654,12 @@ namespace HandQuickbelts
             }
         }
 
+        internal bool TryGetOriginalScale(FVRPhysicalObject physicalObject, out Vector3 scale)
+        {
+            scale = _item == physicalObject ? _originalScale : physicalObject.transform.localScale;
+            return _item == physicalObject;
+        }
+
         private void Track(FVRPhysicalObject physicalObject)
         {
             _item = physicalObject;

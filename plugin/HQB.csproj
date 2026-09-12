@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyName>quaternion.hqb</AssemblyName>
-    <Version>0.4.2</Version>
+    <Version>1.0.0</Version>
     <Authors>quaternion</Authors>
     <AssemblyTitle>Hand Quickbelts</AssemblyTitle>
     <Description>Configurable H3VR quickbelt slots attached below each hand.</Description>

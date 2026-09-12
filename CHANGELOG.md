@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0
+
+- Fixed the approximately 10x spawnlocked-item scaling issue due to mod compatibility (MasteryCamos), limited to Hand Quickbelts slots.
+- Added a compact changelog to the README.
+
 ## 0.4.2 - Release candidate
 
 - Added compatibility with H3VR 1.0 stable (Update 120).
