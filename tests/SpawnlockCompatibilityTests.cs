@@ -29,6 +29,7 @@ public static class SpawnlockCompatibilityTests
             {
                 Check(type.Name + " vanilla", type, true, 1f, 1f, 1f, 1f);
                 Check(type.Name + " vanilla tiny original", type, true, 0.1f, 1f, 1f, 1f);
+                Check(type.Name + " vanilla miniaturized", type, true, 1f, 0.3f, 1f, 1f);
             }
             InstallExternal();
             foreach (Type type in Types)
@@ -37,22 +38,34 @@ public static class SpawnlockCompatibilityTests
                 Check(type.Name + " intentionally doubled", type, true, 2f, 1f, 1f, 2f);
                 Check(type.Name + " non-unit prefab", type, true, 0.5f, 1f, 0.5f, 0.5f);
                 Check(type.Name + " body slot unchanged", type, false, 1f, 1f, 1f, 10f);
-                Check(type.Name + " miniaturized 3x intentionally excluded", type, true, 1f, 0.3f, 1f, 3f);
-                Check(type.Name + " miniaturized 0.5x intentionally excluded", type, true, 1f, 0.05f, 1f, 0.5f);
+                Check(type.Name + " miniaturized 3x corrected", type, true, 1f, 0.3f, 1f, 1f);
+                Check(type.Name + " miniaturized 0.5x corrected", type, true, 1f, 0.05f, 1f, 1f);
+                Check(type.Name + " miniaturized intentional double", type, true, 2f, 0.3f, 1f, 2f);
+                Check(type.Name + " miniaturized non-unit prefab", type, true, 0.5f, 0.3f, 0.5f, 0.5f);
+                Check(type.Name + " miniaturized body slot unchanged", type, false, 1f, 0.3f, 1f, 3f);
+                // Exercise actual collider fitting, including the magazine/grenade-sized
+                // cases that retained the copied scale in 1.0.0.
+                Check(type.Name + " collider 4cm corrected", type, true, 1f, 1f, 1f, 1f, colliderLength: 0.04f);
+                Check(type.Name + " collider 16cm corrected", type, true, 1f, 1f, 1f, 1f, colliderLength: 0.16f);
+                Check(type.Name + " collider 24cm corrected", type, true, 1f, 1f, 1f, 1f, colliderLength: 0.24f);
             }
             _copyMultiplier = 1.005f;
             Check("within tolerance", Types[0], true, 1f, 1f, 1f, 1.005f);
+            Check("miniaturized within tolerance", Types[0], true, 1f, 0.3f, 1f, 1.005f);
             _copyMultiplier = 1.02f;
             Check("outside tolerance", Types[0], true, 1f, 1f, 1f, 10.2f);
+            Check("miniaturized outside tolerance", Types[0], true, 1f, 0.3f, 1f, 3.06f);
             _copyMultiplier = 1f;
             Check("fresh insertion, untracked", Types[0], true, 1f, 1f, 1f, 1f, false);
             Check("approximately 0.1 parent", Types[0], true, 1f, 1f, 1f, 1f, true, 0.10001f);
             Check("wrong parent scale excluded", Types[0], true, 1f, 1f, 1f, 5f, true, 0.2f);
             Check("parented clone", Types[0], true, 1f, 1f, 1f, 1f, true, 0.1f, true);
+            Check("parented miniaturized clone", Types[0], true, 1f, 0.3f, 1f, 1f, true, 0.1f, true);
             _copyScale = false;
             Check("normal clone with external mod loaded", Types[0], true, 0.1f, 0.1f, 1f, 1f);
             _copyScale = true;
             Check("ambiguous prefab match excluded", Types[0], true, 0.1f, 1f, 1f, 1f);
+            Check("miniaturized ambiguous prefab match excluded", Types[0], true, 2f, 0.05f, 1f, 1f);
             _nullResult = true;
             Check("null result", Types[0], true, 1f, 1f, 1f, 0f);
             _nullResult = false;
@@ -63,6 +76,7 @@ public static class SpawnlockCompatibilityTests
             new Harmony("tests.hqb").UnpatchSelf();
             new Harmony("tests.hqb").CreateClassProcessor(typeof(SpawnlockScaleCompatibility)).Patch();
             Check("reverse installation order", Types[0], true, 1f, 1f, 1f, 1f);
+            Check("miniaturized reverse installation order", Types[0], true, 1f, 0.3f, 1f, 1f);
             Debug.Log("HQB_TEST_SUCCESS: " + _passed + " cases passed");
             EditorApplication.Exit(0);
         }
@@ -94,11 +108,11 @@ public static class SpawnlockCompatibilityTests
     }
 
     private static void Check(string name, Type type, bool hqb, float original, float fit, float prefabScale,
-        float expected, bool track = true, float parentScale = 0.1f, bool parentClone = false)
+        float expected, bool track = true, float parentScale = 0.1f, bool parentClone = false, float colliderLength = 0f)
     {
         GameObject root = new GameObject("palm");
         root.transform.localScale = Vector3.one * parentScale;
-        root.transform.rotation = Quaternion.Euler(23f, 41f, -17f);
+        root.transform.rotation = colliderLength > 0f ? Quaternion.identity : Quaternion.Euler(23f, 41f, -17f);
         GameObject slotObject = new GameObject("slot");
         slotObject.transform.SetParent(root.transform, false);
         FVRQuickBeltSlot slot = slotObject.AddComponent<FVRQuickBeltSlot>();
@@ -113,11 +127,23 @@ public static class SpawnlockCompatibilityTests
         item.ObjectWrapper = new FVRObject { Prefab = prefab };
         item.QuickbeltSlot = slot;
         slot.HeldObject = item;
+        if (colliderLength > 0f)
+        {
+            BoxCollider collider = source.AddComponent<BoxCollider>();
+            collider.size = new Vector3(0.01f, 0.01f, colliderLength);
+        }
         if (track)
         {
             HandQuickbeltMiniaturizer mini = slotObject.AddComponent<HandQuickbeltMiniaturizer>();
             typeof(HandQuickbeltMiniaturizer).GetMethod("Track", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(mini, new object[] { item });
+            if (colliderLength > 0f)
+            {
+                typeof(HandQuickbeltMiniaturizer).GetMethod("ApplyScale", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(mini, null);
+                AssertScale(name + " fit", source.transform.lossyScale,
+                    Vector3.one * Mathf.Min(1f, 0.08f / colliderLength));
+            }
         }
         source.transform.localScale *= fit;
         Vector3 storedScale = source.transform.localScale;

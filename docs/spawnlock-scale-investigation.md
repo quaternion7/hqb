@@ -1,5 +1,77 @@
 # Spawnlock clone scale investigation
 
+## 2026-09-14: reproduced and fixed in user gameplay testing
+
+The user reproduced the remaining issue with published 1.0.0 in **HQB MasteryCamo test**, after the startup dependency repairs below. They authorized installing a local 1.0.1 for comparison before publication.
+
+The clone prefix now records both the current stored local scale and the original pre-fit scale already cached by the miniaturizer. The postfix recognizes a clone whose world scale matches the copied stored local scale within 1%, then applies the uniform ratio needed to restore its original world size. This covers the former 5x/3.33x cases without separately calculating the fitting factor. The source is untouched. Existing HQB-only, approximately 0.1 uniform parent, prefab-scale exclusion, null/self, and positive finite scale guards remain. No MasteryCamos reference, dependency, ID check, or patch-order dependency was added; the postfix retains Harmony's Last priority.
+
+Release build passed with zero warnings/errors. The real Unity 5.6/HarmonyX harness passed **106 cases**, each pulling three clones, using production correction/miniaturizer code and simulated game duplication/external scale copying. Coverage includes all six target types, real collider fitting at 4/16/24 cm, original resized items, non-unit prefabs, normal clones without the copying patch, body slots, tolerance, parented clones, and both patch installation orders. The user then repeated their reproduction in the same profile with local 1.0.1 and confirmed the fix worked. They authorized pushing the repository and publishing 1.0.1.
+
+Version metadata, README compatibility text/compact changelog, and CHANGELOG are updated to 1.0.1. The test profile retains the startup support libraries and configuration. Its published 1.0.0 files, manager metadata, and latest reproduction log are backed up under `_diagnostics/hqb-1.0.0-baseline-before-1.0.1-*` before replacement. The release is approved for publication under the existing quaternion-Hand_Quickbelts package identity.
+
+## 2026-09-14: native r2modman profile repaired and startup verified
+
+The user installed the same mods normally into **HQB MasteryCamo test**. Its 15:25:10 log confirmed JsonFileIO 0.0.3 was selected correctly, but MasteryCamos still crashed on missing Newtonsoft.Json. Thus the undeclared-library problem also affects this native minimal installation, independently of the original hand-written profile metadata.
+
+Added Newtonsoft.Json 13.0.3 net35 and four Unity 5.6 Mono support libraries (System.Data, System.Xml.Linq, System.Transactions, Mono.Data.Tds) to that profile's `BepInEx/plugins/HQB-Repro-Runtime-Libraries`. Ran the actual MasteryCamos quest-state serialization probe against this profile successfully.
+
+Then ran H3VR via the same Steam/Doorstop launch mechanism as r2modman with a temporary opt-in startup-check plugin. Both the headless attempt (which initially appeared idle due to delayed startup/log output) and the subsequent normal startup completed MasteryCamos initialization. The normal run logged `Initialized :)` and `Hello, world! Sent from NGA.MasteryCamos 0.0.1`. The diagnostic confirmed both owners' postfixes on all six spawnlock targets and reported `HQB_STARTUP_CHECK: PASS - all six MasteryCamos and HQB spawnlock postfixes installed in H3VR.` The game exited automatically; the checker DLL/config were removed afterward. The normal-run evidence is saved in `_diagnostics/startup-verified-20260914.log` inside **HQB MasteryCamo test**.
+
+The diagnostic's broad `AccessTools.TypeByName` scan produced nonfatal Newtonsoft reflection warnings; source was subsequently narrowed to the known game assembly to avoid unrelated type enumeration. The log also contains a Steamworks shutdown exception after the deliberate quit. Neither prevented verified MasteryCamos initialization or patch installation. The headless run had a MainMenuScreen error from its no-VR environment, so the subsequent normal startup was used as the final evidence. Actual magazine/grenade gameplay reproduction is still for the user's next run.
+
+The profile's HQB DLL SHA-256 remains `638352C6DC93F54526C3B40E97F9FED25BC8C677687FAC9280269BE27D4E01AD` (published 1.0.0). No broader scale correction was applied. The original manually assembled profile no longer exists; the current profile is **HQB MasteryCamo test**.
+
+## 2026-09-14 third runtime follow-up: stripped framework libraries
+
+The 15:14:51 log still shows MasteryCamos aborting before patch installation. Newtonsoft.Json now loads, but `CreateDefaultSaveFile` serialization throws for missing `System.Data, Version=2.0.0.0`. The prior Mono.Cecil DefaultAssemblyResolver check was misleading: its host-framework fallback could resolve assemblies that were not actually available in H3VR's loading paths.
+
+Added System.Data, System.Xml.Linq, System.Transactions, and Mono.Data.Tds from the installed Unity 5.6.7f1 Mono `unity` runtime into the local profile's support-library folder. A new `tests/MasteryCamosSerializationProbe.cs` successfully initialized, serialized, and deserialized the real `NGA.MasteryCamos.QuestsState` from the released DLL under Unity Mono. It explicitly loaded the four support assemblies from the profile and checked their locations; Newtonsoft.Json was an identical copy in the isolated probe directory. This tests the failing JSON path, not the entire Unity startup lifecycle. Also matched all 18 MasteryCamos declared Harmony target methods against the installed game's actual Assembly-CSharp.dll, including overload signatures. HQB remains the unchanged published 1.0.0 binary.
+
+The profile was manually assembled from package archives and manager metadata, not installed through the r2modman UI. A separate profile installed normally through r2modman is a valuable control: its normal dependency selection should avoid the initially pinned old JsonFileIO version, while undeclared Newtonsoft/runtime dependencies may still need investigation. Preserve the manually assembled profile and logs for comparison. No successful in-game MasteryCamos initialization has yet been observed in these runs.
+
+## 2026-09-14 second runtime follow-up: missing Newtonsoft.Json
+
+The next log (15:09:00 local time) shows that the JsonFileIO GUID repair worked: BepInEx attempts to load MasteryCamos. However, `MasteryCamos.FileStuff.InitializeSaveFile` throws `FileNotFoundException` for `Newtonsoft.Json, Version=13.0.0.0`. Initialization aborts before `PatchAll()`, so the scale-copy patches still are not active. The preceding missing save JSON message is the initial-save path; the missing assembly is the fatal error.
+
+Added the official NuGet Newtonsoft.Json 13.0.3 .NET 3.5 DLL (assembly identity 13.0.0.0 with the required public key token) plus its license to the reproduction profile's `BepInEx/plugins/HQB-Repro-Runtime-Libraries` folder. MasteryCamos references this library but does not declare or include it in the inspected package. Checked all direct assembly references of MasteryCamos, JsonFileIO, and Newtonsoft.Json using Mono.Cecil against the profile and installed H3VR Managed directory: all resolve. This checks assembly availability, not gameplay/API compatibility or successful initialization. Updated the creation script and test checklist. HQB's DLL remains identical to published 1.0.0; no broader scale fix has been installed. A fresh game run remains necessary.
+
+## 2026-09-14 runtime follow-up: initial profile did not load MasteryCamos
+
+The first local run's `LogOutput.log` (15:01:16 local time) reports: `Could not load [MasteryCamos 0.0.1] because it has missing dependencies: NGA.JsonFileIO`. HQB 1.0.0 loaded with miniaturization enabled and the 100 mm / 80% defaults. The installed HQB DLL SHA-256 remains `638352C6DC93F54526C3B40E97F9FED25BC8C677687FAC9280269BE27D4E01AD`, identical to the published release. No broader HQB fix was applied.
+
+The reproduction-profile setup incorrectly pinned JsonFileIO to the manifest's minimum 0.0.1. Decompiled 0.0.1 identifies its plugin as `NGA.JsonSaveSystem`; MasteryCamos requires `NGA.JsonFileIO`. JsonFileIO 0.0.3 uses the required `NGA.JsonFileIO` ID. Package-level dependency validation therefore passed even though runtime dependency validation failed. This explains why the user's first profile test did not reproduce the conflict, and does not validate compatibility with a running MasteryCamos.
+
+Updated only the profile's JsonFileIO package/DLL and manager metadata to 0.0.3, retaining a backup and the original log outside the profile. Updated the profile-creation script and checklist accordingly. A fresh game run is still needed to establish that MasteryCamos initializes successfully and to test the scale conflict. The earlier collider-harness results remain synthetic evidence; the specific gameplay outcome is not yet established.
+
+## 2026-09-14: rounds fixed, magazines and grenades still oversized
+
+The new feedback is consistent with a known gap in the 1.0.0 heuristic: it compares clone scale with the **unminiaturized** source scale multiplied by the approximately 10x palm compensation. MasteryCamos instead copies the source's **current, miniaturized local scale**. All six relevant overrides are already patched, including magazines and both grenade types; reinspection of the game overrides and released MasteryCamos postfixes found no missing target explaining this difference.
+
+With default settings the target bounds size is 100 mm times 80%, or 80 mm. For original world scale `s`, fit factor `f`, and uniform parent scale `p = 0.1`, MasteryCamos produces `s * f / p`. HQB 1.0.0 expects `s / p`, within 1%. Consequently it usually corrects only items that were not shrunk (or shrunk less than about 1%). Short rounds plausibly fit; larger magazines and grenades plausibly do not. This is a size-dependent explanation, not a claim that all bullets fit or all magazines/grenades shrink.
+
+Added 18 tests using real BoxColliders and the actual `HandQuickbeltMiniaturizer.Track`, bounds fitting, and `ApplyScale` methods. All six supported types were exercised at each of three lengths in a Unity 5.6.7f1 harness with the existing unrelated-ID scale-copy postfix:
+
+| Representative collider length | Actual fit factor | Clone after scale copy | Clone after HQB 1.0.0 |
+| --- | --- | --- | --- |
+| 4 cm | 1 | 10x | 1x (corrected) |
+| 16 cm | 0.5 | 5x | 5x (missed) |
+| 24 cm | 1/3 | 3.33x | 3.33x (missed) |
+
+These are controlled collider sizes, not measurements of the testers' specific items. All 77 cases passed their assertions, including assertions demonstrating the remaining bug. The original 59 cases already asserted that 3x/0.5x results stayed unchanged; passing them proved the requested narrow behavior, not complete compatibility. The release's test coverage should have been presented more clearly as deliberately incomplete for miniaturized items. The new harness confirms a sufficient mechanism for the report; the exact affected profiles/items still need in-game reproduction. Other modifiers, custom subclasses, or later patches remain possible if the proposed A/B test does not match.
+
+### Next correction to consider
+
+Preserve behavior-based detection without a MasteryCamos dependency. Capture both the actual stored transform and the intended pre-miniaturization scale. Require evidence that the result copied the stored local scale across parent spaces, rather than requiring enlargement relative to the original item to be exactly 10x. Keep the HQB-slot and normal-prefab-clone exclusions. Once matched, restore the intended unminiaturized world scale in the clone's parent space.
+
+Multiplying a 5x clone only by 0.1 would leave it at 0.5x. Correcting the broader case must undo both parent compensation and the temporary fit factor. No production correction, version bump, or publication was made during this follow-up investigation.
+
+### Reproduction profile
+
+Created `HQB 1.0.0 - MasteryCamos Repro` under the local H3VR r2modman profiles directory using `tools/create-spawnlock-repro-profile.ps1`. It contains the public HQB 1.0.0 and MasteryCamos 2.2.3 packages plus BepInExPack H3VR 5.4.1700, Sodalite 1.5.1, JsonFileIO 0.0.1, and ProfileSaveFolder 1.0.0. CamoShop and unrelated mods are absent. Dependency closure, required loader/plugin/patcher files, YAML metadata (six enabled entries), and HQB/MasteryCamos DLL hashes were checked. Existing profiles were not modified. The game was not launched.
+
+See [local test checklist](spawnlock-repro-checklist.md). Keep the default 80 mm stored-size target for the first pass. Then disable miniaturization, remove/reinsert the source, and repeat with a fresh clone. If this mechanism is responsible, the previously missed clones should now reach the 10x signature and be corrected by 1.0.0. This is a diagnostic prediction for the new release, not a universal workaround for the older unfixed release.
+
 ## 1.0.0 implementation: conservative behavior-based correction
 
 The requested release uses a narrower heuristic than the general compatibility design below. It has no dependency, plugin-ID check, or explicit ordering tie to MasteryCamos. A `Priority.Last` postfix runs on the six affected spawnlock overrides, after ordinary-priority postfixes.

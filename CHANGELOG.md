@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Extended the scaling compatibility fix (MasteryCamos) to spawnlocked items miniaturized in Hand Quickbelts slots, including magazines and grenades.
+- Recognized clones now return to their original size before miniaturization; the correction remains limited to hand slots and requires no additional mod dependency.
+
 ## 1.0.0
 
 - Fixed the approximately 10x spawnlocked-item scaling issue due to mod compatibility (MasteryCamos), limited to Hand Quickbelts slots.

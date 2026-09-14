@@ -17,10 +17,11 @@ Adds configurable quickbelt slots around both hands without replacing the player
 
 ## Mod compatibility
 
-Includes a targeted correction for MasteryCamos making spawnlocked items approximately 10x too large when pulled from hand slots. It applies only when the size increase matches the hand-parent scale compensation; other scale mismatches are not covered.
+Includes a targeted correction for spawnlocked items inheriting the hand slot's stored scale, as reported with MasteryCamos. Recognized clones return to their size before storage, including magazines and grenades miniaturized inside the slot. The correction applies only to hand slots and does not require MasteryCamos; normal prefab-sized clones and unrelated scale changes are left alone.
 
 ## Recent changes
 
+- **1.0.1:** Extended the MasteryCamos scaling compatibility fix to items miniaturized in hand slots, including magazines and grenades.
 - **1.0.0:** Fixed the approximately 10x spawnlocked-item scaling issue due to mod compatibility (MasteryCamos), limited to hand slots.
 - **0.4.2:** Added H3VR 1.0 stable support and respected scenes that disable quickbelts.
 - **0.4.1:** Added adjustable stored-object size.

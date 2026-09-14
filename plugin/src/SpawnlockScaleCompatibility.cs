@@ -16,8 +16,8 @@ namespace HandQuickbelts
         {
             internal bool Eligible;
             internal Vector3 OriginalWorldScale;
+            internal Vector3 StoredLocalScale;
             internal Vector3 PrefabScale;
-            internal float ParentScale;
         }
 
         // Compatibility postfixes on these overrides run after the base method returns.
@@ -54,7 +54,8 @@ namespace HandQuickbelts
                 return;
             }
 
-            Vector3 originalLocalScale = __instance.transform.localScale;
+            __state.StoredLocalScale = __instance.transform.localScale;
+            Vector3 originalLocalScale = __state.StoredLocalScale;
             HandQuickbeltMiniaturizer miniaturizer = slot.GetComponent<HandQuickbeltMiniaturizer>();
             if (miniaturizer != null)
             {
@@ -67,7 +68,6 @@ namespace HandQuickbelts
                 return;
             }
             __state.PrefabScale = prefab.transform.localScale;
-            __state.ParentScale = parentScale.x;
             __state.Eligible = true;
         }
 
@@ -79,7 +79,9 @@ namespace HandQuickbelts
             {
                 return;
             }
-            Vector3 expectedOversizedScale = __state.OriginalWorldScale / __state.ParentScale;
+            // A scale-copying postfix transfers the stored local scale into world space.
+            // That scale includes optional fitting, so it need not be 10x the original.
+            Vector3 expectedOversizedScale = __state.StoredLocalScale;
             Vector3 actualScale = __result.transform.lossyScale;
             // Vanilla clones use the prefab scale, even when the stored source was resized.
             // Prefer a missed correction over changing an otherwise normal vanilla clone.
@@ -92,8 +94,15 @@ namespace HandQuickbelts
                 && Close(actualScale.y, expectedOversizedScale.y)
                 && Close(actualScale.z, expectedOversizedScale.z))
             {
-                // Uniform multiplication also works if another mod parents the clone.
-                __result.transform.localScale *= __state.ParentScale;
+                // Restore the pre-fit size, retaining small deviations within tolerance.
+                // Require a uniform correction so rotated/parented clones remain safe.
+                float correction = __state.OriginalWorldScale.x / expectedOversizedScale.x;
+                if (Close(correction, correction)
+                    && Close(expectedOversizedScale.y * correction, __state.OriginalWorldScale.y)
+                    && Close(expectedOversizedScale.z * correction, __state.OriginalWorldScale.z))
+                {
+                    __result.transform.localScale *= correction;
+                }
             }
         }
 
